@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Simple SPA (IndexedDB)</title>
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>Projects & Tasks</h1>
+  </header>
+
+  <main>
+    <section class="card">
+      <h2>Create project</h2>
+      <form id="project-form">
+        <input id="project-name" type="text" placeholder="Project name" required />
+        <button type="submit">Add project</button>
+      </form>
+    </section>
+
+    <section class="card">
+      <h2>Create task</h2>
+      <form id="task-form">
+        <select id="task-project" required></select>
+        <input id="task-title" type="text" placeholder="Task title" required />
+        <select id="task-status">
+          <option value="todo">To-Do</option>
+          <option value="doing">Doing</option>
+          <option value="done">Done</option>
+        </select>
+        <button type="submit">Add task</button>
+      </form>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h2>Projects</h2>
+        <ul id="project-list"></ul>
+      </div>
+
+      <div class="card">
+        <h2>Tasks</h2>
+        <div class="filters">
+          <label>
+            Filter by project:
+            <select id="filter-project"></select>
+          </label>
+          <label>
+            Status:
+            <select id="filter-status">
+              <option value="">All</option>
+              <option value="todo">To-Do</option>
+              <option value="doing">Doing</option>
+              <option value="done">Done</option>
+            </select>
+          </label>
+          <button id="clear-filters">Clear</button>
+        </div>
+        <ul id="task-list"></ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <small>Local, offline-first. Data lives in your browser (IndexedDB).</small>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
