@@ -430,10 +430,12 @@ async function updateDB(newTask){
 document.addEventListener('DOMContentLoaded', () => {
   try {
     findCurrentTask();   // kicks off: loads pointer → loads content → deployUI()
+      alert("TEST");
   } catch (e) {
     console.error(e);
     alert('Startup error: see console');
   }
 });
+
 
 
