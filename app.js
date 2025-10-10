@@ -429,16 +429,8 @@ async function updateDB(newTask){
   readTaskContent();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-  try {
-    alert("TEST");
-    findCurrentTask();   // kicks off: loads pointer → loads content → deployUI()
-      
-  } catch (e) {
-    console.error(e);
-    alert('Startup error: see console');
-  }
-});
+
+
 
 
 
