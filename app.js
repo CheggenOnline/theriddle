@@ -25,6 +25,7 @@ const TABLE_ANSWERS  = 'answers';  // or the exact table name
 // We will cache answers table record IDs by elemID (T1..T4)
 const ANSWER_ROW_IDS = {}; // e.g. { T1: 'recXXXXXXXX', T2:'recYYYYYYYY', ... }
 
+////////////////////////////////////////
 
 // in app.js, replace the jQuery ready with this:
 document.addEventListener('DOMContentLoaded', function () {
@@ -33,6 +34,15 @@ document.addEventListener('DOMContentLoaded', function () {
   // readDB(); // if you still use it
 });
 
+function questionFromCountdown(cid){ return 'T' + cid.slice(1); }  // C3 -> T3
+function nextCountdownFromQuestion(tid){
+  const n = parseInt(tid.slice(1), 10);
+  return 'C' + (n + 1);                                           // T3 -> C4
+}
+let timerId = null;
+let isAdvancing = false;  // guard against double updates
+
+/////////////////////////////////////////////
 
 function prepareCanvasAndDiv(){
     
@@ -179,9 +189,11 @@ function updateTimer() {
 
     if(diff <= 1){
         //update task and rerun getTaskContent
-        clearInterval(refreshTimer);
-        
-        updateCurrentTask();
+        //clearInterval(refreshTimer);
+        //updateCurrentTask();
+
+      onCountdownTick(0);
+      
         
     }else{
         var secs = Math.floor(diff / 1000);
@@ -194,6 +206,24 @@ function updateTimer() {
         context.clearRect(0, 0, canvas.width, canvas.height);
         showContentField();
     }
+}
+
+async function onCountdownTick(msLeft){
+  // ... your rendering of the remaining time ...
+  if (msLeft <= 0) {
+    if (timerId) { clearInterval(timerId); timerId = null; }
+    if (isAdvancing) return;
+    isAdvancing = true;
+
+    // Move pointer from Cn to Tn (not beyond!)
+    const qId = questionFromCountdown(currentTask); // e.g. C1 -> T1
+    await updateDB(qId);                             // updates pointer in Airtable
+    currentTask = qId;
+    isAdvancing = false;
+
+    // Load and render the question
+    await readTaskContent();
+  }
 }
 
 function runTask(){
@@ -269,29 +299,42 @@ function compareToFasit(answer){
 }
 
 
-function correctAnswer(){
+function correctAnswerOLD(){
     answeredCorrect = "true";
     hideLoader();
     turnCanvasGreen();
     
     setTimeout(function(){
-        
-        //clear canvas 
-        //context.clearRect(0, 0, canvas.width, canvas.height);
-        
-        //showContentField();
-        //showContentField();
-        
-        //empty the value
-        //document.getElementById("inputField").value = '';
-        
-        //set focus to input inputField
-        //document.getElementById("inputField").focus();
-        
+               
         updateCurrentTask();
         
     }, 4000);
 }
+
+async function correctAnswer(){
+  // ... your existing “correct!” UI/animation ...
+
+  if (isAdvancing) return;
+  isAdvancing = true;
+
+  const nextC = nextCountdownFromQuestion(currentTask); // e.g. T1 -> C2
+  await updateDB(nextC);                                 // update pointer in Airtable
+  currentTask = nextC;
+  isAdvancing = false;
+
+  await readTaskContent(); // will now show the next countdown
+
+  answeredCorrect = "true";
+    hideLoader();
+    turnCanvasGreen();
+    
+    setTimeout(function(){
+               
+        updateCurrentTask();
+        
+    }, 4000);
+}
+
 
 function wrongAnswerNew(){
 
@@ -428,6 +471,7 @@ async function updateDB(newTask){
   currentTask = newTask;
   readTaskContent();
 }
+
 
 
 
