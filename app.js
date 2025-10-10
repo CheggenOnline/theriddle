@@ -27,6 +27,7 @@ const ANSWER_ROW_IDS = {}; // e.g. { T1: 'recXXXXXXXX', T2:'recYYYYYYYY', ... }
 
 
 $( document ).ready(function() {
+    alert("Hei");
     prepareCanvasAndDiv();
     findCurrentTask();
     //readDB();
@@ -437,6 +438,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Startup error: see console');
   }
 });
+
 
 
 
