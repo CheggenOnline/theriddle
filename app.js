@@ -26,12 +26,13 @@ const TABLE_ANSWERS  = 'answers';  // or the exact table name
 const ANSWER_ROW_IDS = {}; // e.g. { T1: 'recXXXXXXXX', T2:'recYYYYYYYY', ... }
 
 
-$( document ).ready(function() {
-    alert("Hei");
-    prepareCanvasAndDiv();
-    findCurrentTask();
-    //readDB();
+// in app.js, replace the jQuery ready with this:
+document.addEventListener('DOMContentLoaded', function () {
+  prepareCanvasAndDiv();
+  findCurrentTask();
+  // readDB(); // if you still use it
 });
+
 
 function prepareCanvasAndDiv(){
     
@@ -438,6 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
     alert('Startup error: see console');
   }
 });
+
 
 
 
