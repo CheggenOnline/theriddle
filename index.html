@@ -2,49 +2,20 @@
 <html lang="en">
 <head>
   <meta charset="utf-8" />
+  <title>the Riddle</title>
   <meta name="viewport" content="width=device-width,initial-scale=1" />
-  <meta name="theme-color" content="#333333" />
-  <title>Quiz</title>
-
-  <!-- CSS: make sure the file name matches yours -->
   <link rel="stylesheet" href="styles.css" />
-  <style>
-    /* small inline debug box so you see problems instantly */
-    #debug-status{position:fixed;left:8px;right:8px;bottom:8px;padding:8px;border-radius:8px;background:#000;color:#fff;font:12px/1.3 monospace;z-index:99999;opacity:.85;display:none}
-  </style>
+  <script src="app.js"></script>
+  <link rel="icon" type="image/png" href="favicon.png">
 </head>
 <body>
-  <canvas id="Matrix"></canvas>
-  <div id="contentWrapper"><div id="content"></div></div>
-  <div id="loader" class="loader">
-    <div class="inner one"></div>
-    <div class="inner two"></div>
-    <div class="inner three"></div>
-  </div>
-
-  <div id="debug-status"></div>
-
-  <!-- JS: put your actual filename here; use defer so it runs after HTML is parsed -->
-  <script defer src="app.js"></script>
-  <script>
-    // Basic runtime checks: shows a banner if app.js didn’t run or threw early
-    (function(){
-      function show(msg){
-        var el = document.getElementById('debug-status');
-        el.style.display = 'block';
-        el.textContent = msg;
-      }
-      // 1) Does the script tag exist and load?
-      var scripts = Array.from(document.scripts).map(s => s.src || '[inline]');
-      if(!scripts.some(s => s.endsWith('app.js'))) show('Could not find <script src="app.js">. Check the filename/path.');
-      // 2) Give app.js a tiny window to register globals / kick off
-      setTimeout(function(){
-        // Your JS defines functions like findCurrentTask / deployUI etc.
-        if(typeof findCurrentTask !== 'function' && typeof deployUI !== 'function'){
-          show('app.js loaded but main functions are undefined. Likely a syntax error at the top of app.js. Open DevTools → Console for the first error.');
-        }
-      }, 300);
-    })();
-  </script>
+  <meta name="theme-color" content="#333333">
+<canvas id="Matrix"></canvas>
+<div id="contentWrapper"><div id="content"></div></div>
+<div id="loader" class="loader">
+  <div class="inner one"></div>
+  <div class="inner two"></div>
+  <div class="inner three"></div>
+</div>
 </body>
 </html>
