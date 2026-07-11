@@ -143,3 +143,9 @@ input {
     transform: rotateX(35deg) rotateY(55deg) rotateZ(360deg);
   }
 }
+
+.timer.lost {
+    color:#E8C15F;
+    text-shadow:0 0 14px rgba(232,193,95,.85), 0 0 30px rgba(232,193,95,.45);
+    transition: text-shadow .2s ease;
+}

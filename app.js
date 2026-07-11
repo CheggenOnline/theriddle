@@ -51,17 +51,75 @@ function runCountdown(){
   refreshTimer = setInterval(updateTimer, 1000);
 }
 function stopCountdown(){ if(refreshTimer){ clearInterval(refreshTimer); refreshTimer = null; } }
+var lostAnimating = false;
+var lastLostVal = null;
+// Hieroglyfer i ånden av Lost-nedtellingens symboler
+var LOST_GLYPHS = ['𓂀','𓆑','𓉔','𓊖','𓁷','𓃰','𓎛','𓆓','𓅓','𓐍','𓏏','𓋹'];
+function glyph(){ return LOST_GLYPHS[Math.floor(Math.random()*LOST_GLYPHS.length)]; }
+function visTid(txt, lost){
+  content.innerHTML = '<div class="timer' + (lost ? ' lost' : '') + '">' + txt + '</div>';
+}
+function secsIgjen(){
+  const future = Date.parse((currentT0 || '').replace(/&#58;/g, ':'));
+  return Math.floor((future - Date.now()) / 1000);
+}
 function updateTimer(){
   const future = Date.parse((currentT0 || '').replace(/&#58;/g, ':'));
   const diff = future - Date.now();
   if(diff <= 1000){
-    // tiden er ute – serveren avanserer selv når vi ber om ny tilstand
     stopCountdown();
     loadState();
     return;
   }
+  if(lostAnimating) return;                 // ikke overskriv mens animasjonen kjører
   const s = Math.floor(diff / 1000);
-  content.innerHTML = '<div class="timer">' + s + '</div>';
+  visTid(String(s), false);
+  // hver gang telleren treffer et tall som slutter på tre nuller
+  if(s % 1000 === 0 && s !== lastLostVal){
+    lastLostVal = s;
+    lostAnim();
+  }
+}
+function lostAnim(){
+  // Total varighet ~7,5 s (godt under 20 s): morph inn -> hold -> morph ut
+  lostAnimating = true;
+  const start = String(secsIgjen());
+  const n = start.length;
+  let step = 0;
+  // Fase 1: sifrene morfer til hieroglyfer, ett om gangen (venstre->høyre)
+  const inn = setInterval(function(){
+    step++;
+    let out = '';
+    for(let i=0;i<n;i++) out += (i < step ? glyph() : start[i]);
+    visTid(out, true);
+    if(step >= n){
+      clearInterval(inn);
+      // Fase 2: hold ett stort Lost-symbol, med lett flimmer
+      let holdTicks = 0;
+      const hold = setInterval(function(){
+        visTid(glyph(), true);
+        holdTicks++;
+        if(holdTicks >= 12){        // ~3 s (12 x 250 ms)
+          clearInterval(hold);
+          // Fase 3: morf tilbake til det AKTUELLE tallet
+          const end = String(Math.max(0, secsIgjen()));
+          const m = end.length;
+          let rstep = m;
+          const ut = setInterval(function(){
+            rstep--;
+            let out = '';
+            for(let i=0;i<m;i++) out += (i < rstep ? glyph() : end[i]);
+            visTid(out, true);
+            if(rstep <= 0){
+              clearInterval(ut);
+              lostAnimating = false;
+              updateTimer();          // synk til virkelig tid
+            }
+          }, 130);
+        }
+      }, 250);
+    }
+  }, 140);
 }
 
 // ---------- Spørsmål ----------
