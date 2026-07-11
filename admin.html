@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="nb">
+<head>
+<meta charset="utf-8"/>
+<title>the Riddle – admin</title>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<style>
+  body{margin:0;font-family:-apple-system,'Segoe UI',Roboto,sans-serif;background:#1c262b;color:#e8eef0;padding:16px;}
+  h1{font-size:20px;} h2{font-size:15px;margin:0 0 8px;}
+  .card{background:#26333a;border-radius:12px;padding:14px;margin-bottom:12px;max-width:640px;}
+  label{display:block;font-size:12px;color:#9fb0b8;margin:8px 0 3px;}
+  input,select,textarea{width:100%;box-sizing:border-box;font-size:15px;padding:9px 10px;border:1px solid #3a4b54;border-radius:8px;background:#1c262b;color:#fff;font-family:inherit;}
+  button{border:none;border-radius:10px;padding:11px 14px;font-size:14px;font-weight:700;cursor:pointer;background:#3f9e4f;color:#fff;margin-top:10px;}
+  button.sek{background:#3a4b54;}
+  button.fare{background:#7a2f2f;}
+  .rad{display:flex;gap:8px;align-items:center;}
+  .rad>*{margin-top:0;}
+  .steg{border-left:3px solid #3f9e4f;padding-left:10px;margin:10px 0;}
+  .steg.c{border-color:#e8a13c;}
+  .sub{font-size:12px;color:#9fb0b8;}
+  .svar{font-size:13px;padding:3px 0;border-bottom:1px solid #33434c;}
+  #laas{max-width:340px;}
+  #status{position:fixed;left:16px;right:16px;bottom:16px;background:#111;border-radius:10px;padding:12px;font-size:13px;display:none;}
+  .pill{display:inline-block;background:#3a4b54;border-radius:20px;padding:3px 10px;font-size:12px;margin-left:6px;}
+</style>
+</head>
+<body>
+<h1>🗝️ the Riddle – admin</h1>
+<div class="card" id="laas">
+  <h2>Logg inn</h2>
+  <input id="pw" type="password" placeholder="Admin-passord" onkeydown="if(event.key==='Enter')laasOpp()">
+  <button onclick="laasOpp()">Åpne</button>
+  <div class="sub" id="laasFeil" style="margin-top:8px;"></div>
+</div>
+<div id="panel" style="display:none;">
+  <div class="card">
+    <h2>Nåværende steg</h2>
+    <div class="rad"><select id="current"></select><button class="sek" onclick="lagre()">Sett & lagre</button></div>
+    <div class="sub" style="margin-top:6px;">Dette er steget deltakerne er på akkurat nå.</div>
+  </div>
+  <div class="card">
+    <h2>Steg <span class="sub">(nedtellinger og spørsmål)</span></h2>
+    <div id="steg"></div>
+  </div>
+  <div class="card">
+    <button onclick="lagre()">💾 Lagre alle endringer</button>
+    <button class="sek" onclick="last()">↻ Hent på nytt</button>
+  </div>
+  <div class="card">
+    <h2>Innsendte svar</h2>
+    <div id="svar"></div>
+    <button class="fare" onclick="toemSvar()">🗑️ Tøm svarlogg</button>
+  </div>
+</div>
+<div id="status"></div>
+<script>
+const API='https://riddle-api.cheggen.workers.dev';
+let KEY='', CFG=null;
+function melding(t){const e=document.getElementById('status');e.textContent=t;e.style.display='block';clearTimeout(window._t);window._t=setTimeout(()=>e.style.display='none',3500);}
+function esc(s){return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');}
+async function laasOpp(){
+  KEY=document.getElementById('pw').value;
+  const r=await fetch(API+'/admin',{headers:{'X-Admin-Key':KEY}});
+  if(r.status!==200){document.getElementById('laasFeil').textContent='Feil passord 🙈';return;}
+  try{sessionStorage.setItem('riddle_key',KEY);}catch(e){}
+  CFG=await r.json();
+  document.getElementById('laas').style.display='none';
+  document.getElementById('panel').style.display='block';
+  tegn();
+}
+async function last(){
+  const r=await fetch(API+'/admin',{headers:{'X-Admin-Key':KEY}});
+  CFG=await r.json();tegn();melding('Hentet.');
+}
+function stegIder(){return Object.keys(CFG.steps);}
+function tegn(){
+  // current-dropdown
+  const cur=document.getElementById('current');
+  cur.innerHTML=stegIder().map(id=>`<option value="${id}"${id===CFG.current?' selected':''}>${id}</option>`).join('');
+  // steg
+  document.getElementById('steg').innerHTML=stegIder().map(id=>{
+    const s=CFG.steps[id];
+    let h=`<div class="steg ${s.type==='countdown'?'c':''}"><b>${id}</b> <span class="pill">${s.type}</span>`;
+    if(s.type==='countdown'){
+      h+=`<label>Teller ned til (UTC)</label><input value="${esc(s.countdownTo)}" oninput="CFG.steps['${id}'].countdownTo=this.value">`;
+      h+=`<label>Neste steg</label><input value="${esc(s.next)}" oninput="CFG.steps['${id}'].next=this.value">`;
+    }else if(s.type==='question'){
+      h+=`<label>Spørsmål</label><input value="${esc(s.question)}" oninput="CFG.steps['${id}'].question=this.value">`;
+      h+=`<label>Svar (fasit)</label><input value="${esc(s.answer)}" oninput="CFG.steps['${id}'].answer=this.value">`;
+      h+=`<label>Hint (valgfritt)</label><input value="${esc(s.hint)}" oninput="CFG.steps['${id}'].hint=this.value">`;
+      h+=`<label>Neste steg</label><input value="${esc(s.next)}" oninput="CFG.steps['${id}'].next=this.value">`;
+    }else if(s.type==='final'){
+      h+=`<label>Videresend til</label><input value="${esc(s.redirect)}" oninput="CFG.steps['${id}'].redirect=this.value">`;
+    }
+    h+=`</div>`;return h;
+  }).join('');
+  // svar
+  const sv=CFG.answers||{};
+  const ider=Object.keys(sv);
+  document.getElementById('svar').innerHTML= ider.length? ider.map(id=>
+    `<div style="margin-bottom:8px;"><b>${id}</b> (${sv[id].length})<br>`+
+    sv[id].slice(-30).map(x=>`<div class="svar">${esc(x.a)} <span class="sub">· ${new Date(x.ts).toLocaleString('nb-NO')}</span></div>`).join('')+`</div>`
+  ).join('') : '<div class="sub">Ingen innsendte svar ennå.</div>';
+}
+async function lagre(){
+  CFG.current=document.getElementById('current').value;
+  const r=await fetch(API+'/admin/save',{method:'POST',headers:{'Content-Type':'application/json','X-Admin-Key':KEY},body:JSON.stringify({steps:CFG.steps,current:CFG.current})});
+  if(r.status===200){const j=await r.json();CFG=j.cfg;tegn();melding('✅ Lagret og publisert.');}
+  else melding('⚠️ Kunne ikke lagre.');
+}
+async function toemSvar(){
+  if(!confirm('Tømme hele svarloggen?'))return;
+  await fetch(API+'/admin/clearanswers',{method:'POST',headers:{'X-Admin-Key':KEY}});
+  last();
+}
+// auto-innlogging hvis nøkkel er husket
+(function(){try{const k=sessionStorage.getItem('riddle_key');if(k){document.getElementById('pw').value=k;laasOpp();}}catch(e){}})();
+</script>
+</body>
+</html>
