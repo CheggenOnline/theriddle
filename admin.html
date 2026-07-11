@@ -82,7 +82,12 @@ function tegn(){
     const s=CFG.steps[id];
     let h=`<div class="steg ${s.type==='countdown'?'c':''}"><b>${id}</b> <span class="pill">${s.type}</span>`;
     if(s.type==='countdown'){
-      h+=`<label>Teller ned til (UTC)</label><input value="${esc(s.countdownTo)}" oninput="CFG.steps['${id}'].countdownTo=this.value">`;
+      h+=`<label>Teller ned til (dato + klokkeslett, UTC)</label>
+        <div class="rad">
+          <input type="date" id="d-${id}" value="${isoDato(s.countdownTo)}" onchange="settDatoTid('${id}')">
+          <input type="time" id="t-${id}" value="${isoTid(s.countdownTo)}" onchange="settDatoTid('${id}')">
+        </div>
+        <div class="sub" id="iso-${id}" style="margin-top:4px;">${esc(s.countdownTo)}</div>`;
       h+=`<label>Neste steg</label><input value="${esc(s.next)}" oninput="CFG.steps['${id}'].next=this.value">`;
     }else if(s.type==='question'){
       h+=`<label>Spørsmål</label><input value="${esc(s.question)}" oninput="CFG.steps['${id}'].question=this.value">`;
@@ -101,6 +106,17 @@ function tegn(){
     `<div style="margin-bottom:8px;"><b>${id}</b> (${sv[id].length})<br>`+
     sv[id].slice(-30).map(x=>`<div class="svar">${esc(x.a)} <span class="sub">· ${new Date(x.ts).toLocaleString('nb-NO')}</span></div>`).join('')+`</div>`
   ).join('') : '<div class="sub">Ingen innsendte svar ennå.</div>';
+}
+function pad(n){return String(n).padStart(2,'0');}
+function isoDato(iso){const d=new Date(iso);return isNaN(d)?'':d.getUTCFullYear()+'-'+pad(d.getUTCMonth()+1)+'-'+pad(d.getUTCDate());}
+function isoTid(iso){const d=new Date(iso);return isNaN(d)?'':pad(d.getUTCHours())+':'+pad(d.getUTCMinutes());}
+function settDatoTid(id){
+  const dv=document.getElementById('d-'+id).value, tv=document.getElementById('t-'+id).value||'00:00';
+  if(!dv)return;
+  const [Y,M,D]=dv.split('-').map(Number), [h,m]=tv.split(':').map(Number);
+  const iso=new Date(Date.UTC(Y,M-1,D,h,m,0)).toISOString();
+  CFG.steps[id].countdownTo=iso;
+  const el=document.getElementById('iso-'+id); if(el) el.textContent=iso;
 }
 async function lagre(){
   CFG.current=document.getElementById('current').value;

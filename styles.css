@@ -36,7 +36,7 @@ input {
   padding-left:0px;
   border: none;
   border-radius: 0;
-  color: #FFFFFF80;
+  color: #E8C15F;
   background: transparent;
   font-size: 30px;
   transition: .3s ease;
@@ -44,7 +44,7 @@ input {
 }
 
 .bar {
-  background-color: #FFFFFF80;
+  background-color: #E8C15F;
   content: '';
   width: 200px;
   height: 4px;
@@ -54,12 +54,13 @@ input {
 .timer {
     text-align:center;
     font-size:30px;
+    color:#E8C15F;
 }
 
 #questionLabel{
     font-size: 30px;
     font-weight: normal;
-    color:#FFFFFF80;
+    color:#E8C15F;
     text-align: center;
     width:200px;
 }
@@ -67,7 +68,7 @@ input {
 #hintLabel{
     font-size: 12px;
     font-weight: normal;
-    color:#FFFFFF80;
+    color:#E8C15F;
     text-align: center;
     width:200px;
     margin-top: 12px;
