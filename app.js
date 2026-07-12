@@ -109,45 +109,63 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Total varighet ~7,5 s (godt under 20 s): morph inn -> hold -> morph ut
+  // Ny sekvens: alle sifre spinner (flipklokke) -> en og en bytter til
+  // bokstaver/spesialtegn og lander paa "riddle" (ekstra ruter -> "*") ->
+  // holdes ~1 s -> spinner tilbake og lander paa naavaerende nedtelling.
   lostAnimating = true;
-  const start = String(secsIgjen());
-  const n = start.length;
-  let step = 0;
-  // Fase 1: sifrene morfer til hieroglyfer, ett om gangen (venstre->høyre)
-  const inn = setInterval(function(){
-    step++;
-    let out = '';
-    for(let i=0;i<n;i++) out += (i < step ? glyph() : start[i]);
-    visTid(out, true);
-    if(step >= n){
-      clearInterval(inn);
-      // Fase 2: hold ett stort Lost-symbol, med lett flimmer
-      let holdTicks = 0;
-      const hold = setInterval(function(){
-        visTid(glyph(), true);
-        holdTicks++;
-        if(holdTicks >= 12){        // ~3 s (12 x 250 ms)
-          clearInterval(hold);
-          // Fase 3: morf tilbake til det AKTUELLE tallet
-          const end = String(Math.max(0, secsIgjen()));
-          const m = end.length;
-          let rstep = m;
-          const ut = setInterval(function(){
-            rstep--;
-            let out = '';
-            for(let i=0;i<m;i++) out += (i < rstep ? glyph() : end[i]);
-            visTid(out, true);
-            if(rstep <= 0){
-              clearInterval(ut);
-              lostAnimating = false;
-              updateTimer();          // synk til virkelig tid
-            }
-          }, 130);
-        }
-      }, 250);
+  const startStr = String(Math.max(0, secsIgjen()));
+  let W = Math.max(startStr.length, 6);
+  if((W - 6) % 2 === 1) W++;                    // symmetrisk *-padding
+  const lp = (W - 6) / 2, rp = W - 6 - lp;
+  const wordTarget = '*'.repeat(lp) + 'riddle' + '*'.repeat(rp);
+  const NUM = '0123456789';
+  const ALPHA = 'abcdefghijklmnopqrstuvwxyz*!?#@&';
+
+  // tidslinje (ms)
+  const STAG = 220, ALPHARUN = 520, TICK = 80;
+  const p1end = 2000;                           // fase 1: alle spinner tall
+  const switchT = [], lockT = [];
+  for(let i = 0; i < W; i++){ switchT[i] = p1end + i * STAG; lockT[i] = switchT[i] + ALPHARUN; }
+  const p2end = lockT[W - 1];                   // fase 2: en og en -> bokstaver -> land
+  const p3end = p2end + 1000;                   // fase 3: hold ordet ~1 s
+  const p4spinEnd = p3end + 700;                // fase 4: spinn tall igjen ...
+  const backLockT = [];
+  for(let i = 0; i < W; i++) backLockT[i] = p4spinEnd + i * 180;
+  const p4end = backLockT[W - 1] + 140;         // ... og land tilbake paa nedtellingen
+
+  const t0 = Date.now();
+  let backPadded = null;
+  const iv = setInterval(function(){
+    const t = Date.now() - t0;
+    const k = Math.floor(t / TICK);
+    let out = [];
+    if(t < p1end){
+      for(let i = 0; i < W; i++) out.push(NUM[(k + i) % 10]);
+    } else if(t < p2end){
+      for(let i = 0; i < W; i++){
+        if(t >= lockT[i]) out.push(wordTarget[i]);
+        else if(t >= switchT[i]) out.push(ALPHA[(k + i * 3) % ALPHA.length]);
+        else out.push(NUM[(k + i) % 10]);
+      }
+    } else if(t < p3end){
+      for(let i = 0; i < W; i++) out.push(wordTarget[i]);
+    } else if(t < p4end){
+      if(backPadded === null){
+        const b = String(Math.max(0, secsIgjen()));
+        backPadded = (' '.repeat(Math.max(0, W - b.length)) + b).slice(-W);
+      }
+      for(let i = 0; i < W; i++){
+        if(t >= backLockT[i]) out.push(backPadded[i]);
+        else out.push(NUM[(k + i) % 10]);
+      }
+    } else {
+      clearInterval(iv);
+      lostAnimating = false;
+      updateTimer();                            // synk til eksakt naavaerende tid
+      return;
     }
-  }, 140);
+    visTid(out.join(''), true);
+  }, TICK);
 }
 
 // ---------- Spørsmål ----------
