@@ -56,8 +56,36 @@ var lastLostVal = null;
 // Hieroglyfer i ånden av Lost-nedtellingens symboler
 var LOST_GLYPHS = ['𓂀','𓆑','𓉔','𓊖','𓁷','𓃰','𓎛','𓆓','𓅓','𓐍','𓏏','𓋹'];
 function glyph(){ return LOST_GLYPHS[Math.floor(Math.random()*LOST_GLYPHS.length)]; }
+
+// Flip-klokke: hvert tegn får en fast kvadrat-rute. Symbolet skaleres slik at
+// det alltid passer innenfor ruten – også de brede Lost-hieroglyfene.
+var lastChars = [];
+var lastLostFlag = false;
+function fitSym(el){
+  el.style.transform = 'scale(1)';           // nullstill før måling
+  const cell = el.parentNode.parentNode;     // .sym -> .face -> .cell
+  const maxW = cell.clientWidth  * 0.80;
+  const maxH = cell.clientHeight * 0.80;
+  const w = el.offsetWidth, h = el.offsetHeight;
+  if(!w || !h) return;
+  const s = Math.min(maxW / w, maxH / h, 1);
+  el.style.transform = 'scale(' + s + ')';
+}
 function visTid(txt, lost){
-  content.innerHTML = '<div class="timer' + (lost ? ' lost' : '') + '">' + txt + '</div>';
+  const chars = Array.from(String(txt));     // kodepunkt-trygt (hieroglyfer = surrogatpar)
+  const reset = (lost !== lastLostFlag) || (chars.length !== lastChars.length);
+  let h = '<div class="flip' + (lost ? ' lost' : '') + '">';
+  for(let i = 0; i < chars.length; i++){
+    const endret = reset || lastChars[i] !== chars[i];
+    h += '<div class="cell' + (endret ? ' flipin' : '') + '"><div class="face">' +
+         '<span class="sym">' + chars[i] + '</span></div></div>';
+  }
+  h += '</div>';
+  content.innerHTML = h;
+  const syms = content.querySelectorAll('.flip .sym');
+  requestAnimationFrame(function(){ syms.forEach(fitSym); });
+  lastChars = chars;
+  lastLostFlag = lost;
 }
 function secsIgjen(){
   const future = Date.parse((currentT0 || '').replace(/&#58;/g, ':'));
@@ -185,30 +213,4 @@ function hideContentField(){ content.style.display = 'none'; }
 function showContentField(){ content.style.display = 'block'; }
 function hideLoader(){ loader.style.display = 'none'; }
 function showLoader(){ loader.style.display = 'block'; }
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-
-// ---------- Matrix-easter-egg ----------
-function runTheMatrix(){
-  if(matrixTimer) return;
-  const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン';
-  const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const nums = '0123456789';
-  const alphabet = katakana + latin + nums;
-  const fontSize = 16;
-  const columns = canvas.width / fontSize;
-  const rainDrops = [];
-  for(let x = 0; x < columns; x++) rainDrops[x] = 1;
-  const draw = () => {
-    context.fillStyle = 'rgba(0, 0, 0, 0.05)';
-    context.fillRect(0, 0, canvas.width, canvas.height);
-    context.fillStyle = '#0F0';
-    context.font = fontSize + 'px monospace';
-    for(let i = 0; i < rainDrops.length; i++){
-      const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
-      context.fillText(text, i * fontSize, rainDrops[i] * fontSize);
-      if(rainDrops[i] * fontSize > canvas.height && Math.random() > 0.975) rainDrops[i] = 0;
-      rainDrops[i]++;
-    }
-  };
-  matrixTimer = setInterval(draw, 30);
-}
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')

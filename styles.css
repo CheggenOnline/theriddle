@@ -24,9 +24,6 @@ body {
   top: 50%;
   -webkit-transform: translate(-50%, -50%);
   transform: translate(-50%, -50%);
-  
-  height:100px;
-  width:200px;
 }
 
 input {
@@ -149,3 +146,5 @@ input {
     text-shadow:0 0 14px rgba(232,193,95,.85), 0 0 30px rgba(232,193,95,.45);
     transition: text-shadow .2s ease;
 }
+
+/* ---------- Flip-klokke -------
