@@ -58,11 +58,11 @@ var LOST_GLYPHS = ['𓂀','𓆑','𓉔','𓊖','𓁷','𓃰','𓎛','𓆓','𓅓
 function glyph(){ return LOST_GLYPHS[Math.floor(Math.random()*LOST_GLYPHS.length)]; }
 
 // Flip-klokke: hvert tegn får en fast kvadrat-rute. Symbolet skaleres slik at
-// det alltid passer innenfor ruten – også de brede Lost-hieroglyfene.
+// det alltid passer innenfor ruten - ogsaa de brede Lost-hieroglyfene.
 var lastChars = [];
 var lastLostFlag = false;
 function fitSym(el){
-  el.style.transform = 'scale(1)';           // nullstill før måling
+  el.style.transform = 'scale(1)';           // nullstill foer maaling
   const cell = el.parentNode.parentNode;     // .sym -> .face -> .cell
   const maxW = cell.clientWidth  * 0.80;
   const maxH = cell.clientHeight * 0.80;
@@ -213,4 +213,30 @@ function hideContentField(){ content.style.display = 'none'; }
 function showContentField(){ content.style.display = 'block'; }
 function hideLoader(){ loader.style.display = 'none'; }
 function showLoader(){ loader.style.display = 'block'; }
-function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+function esc(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ---------- Matrix-easter-egg ----------
+function runTheMatrix(){
+  if(matrixTimer) return;
+  const katakana = 'アァカサタナハマヤャラワガザダバパイィキシチニヒミリヰギジヂビピウゥクスツヌフムユュルグズブヅプエェケセテネヘメレヱゲゼデベペオォコソトノホモヨョロヲゴゾドボポヴッン';
+  const latin = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const nums = '0123456789';
+  const alphabet = katakana + latin + nums;
+  const fontSize = 16;
+  const columns = canvas.width / fontSize;
+  const rainDrops = [];
+  for(let x = 0; x < columns; x++) rainDrops[x] = 1;
+  const draw = () => {
+    context.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    context.fillRect(0, 0, canvas.width, canvas.height);
+    context.fillStyle = '#0F0';
+    context.font = fontSize + 'px monospace';
+    for(let i = 0; i < rainDrops.length; i++){
+      const text = alphabet.charAt(Math.floor(Math.random() * alphabet.length));
+      context.fillText(text, i * fontSize, rainDrops[i] * fontSize);
+      if(rainDrops[i] * fontSize > canvas.height && Math.random() > 0.975) rainDrops[i] = 0;
+      rainDrops[i]++;
+    }
+  };
+  matrixTimer = setInterval(draw, 30);
+}
