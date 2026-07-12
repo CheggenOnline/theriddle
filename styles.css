@@ -147,4 +147,59 @@ input {
     transition: text-shadow .2s ease;
 }
 
-/* ---------- Flip-klokke -------
+/* ---------- Flip-klokke ---------- */
+.flip{
+  display:flex;
+  gap:10px;
+  justify-content:center;
+  align-items:center;
+}
+.flip .cell{
+  position:relative;
+  width:64px;
+  height:92px;
+  border-radius:10px;
+  background:linear-gradient(#33434e 0%, #1b242a 100%);
+  box-shadow:0 6px 14px rgba(0,0,0,.5), inset 0 0 0 1px rgba(255,255,255,.05);
+  overflow:hidden;
+}
+.flip .cell::after{
+  content:'';
+  position:absolute;
+  left:0; right:0; top:50%;
+  height:2px;
+  margin-top:-1px;
+  background:rgba(0,0,0,.55);
+  z-index:3;
+}
+.flip .cell .face{
+  width:100%;
+  height:100%;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  transform-origin:center center;
+}
+.flip .cell.flipin .face{
+  animation:flipIn .34s ease;
+}
+@keyframes flipIn{
+  0%   { transform:perspective(220px) rotateX(-88deg); opacity:.15; }
+  55%  { opacity:1; }
+  100% { transform:perspective(220px) rotateX(0deg);   opacity:1; }
+}
+.flip .cell .sym{
+  display:inline-block;
+  font-size:56px;
+  line-height:1;
+  color:#E8C15F;
+  transform-origin:center center;
+  will-change:transform;
+}
+.flip.lost .cell{
+  box-shadow:0 6px 14px rgba(0,0,0,.5), inset 0 0 0 1px rgba(232,193,95,.25),
+             0 0 22px rgba(232,193,95,.35);
+}
+.flip.lost .cell .sym{
+  text-shadow:0 0 14px rgba(232,193,95,.85), 0 0 30px rgba(232,193,95,.45);
+}
