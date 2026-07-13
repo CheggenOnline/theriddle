@@ -53,6 +53,7 @@ function runCountdown(){
 function stopCountdown(){ if(refreshTimer){ clearInterval(refreshTimer); refreshTimer = null; } }
 var lostAnimating = false;
 var lastLostVal = null;
+var lostTimers = [];
 // ---------- Odometer-rulle (fungerer med baade sifre, bokstaver og *) ----------
 var cells = [], cellCount = 0;
 function getFlip(){
@@ -132,9 +133,10 @@ function lostAnim(){
   // spesialtegn og lander paa "riddle" (ekstra ruter -> "*") -> holdes ~1 s ->
   // ruller tilbake og lander paa naavaerende nedtelling.
   lostAnimating = true;
+  lostTimers.forEach(clearTimeout); lostTimers = [];        // avbryt ev. tidligere kjoring
   const startStr = String(Math.max(0, secsIgjen()));
   let W = Math.max(startStr.length, 6);
-  if((W - 6) % 2 === 1) W++;                       // symmetrisk *-padding
+  if((W - 6) % 2 === 1) W++;                                // symmetrisk *-padding
   const lp = (W - 6) / 2, rp = W - 6 - lp;
   const word = ('*'.repeat(lp) + 'riddle' + '*'.repeat(rp)).split('');
   const DIG = '0123456789';
@@ -150,32 +152,33 @@ function lostAnim(){
   const P2 = 2150, STAG = 260, RUN = 1200;
   for(let i = 0; i < W; i++){
     (function(i){
-      setTimeout(function(){
+      lostTimers.push(setTimeout(function(){
         rollTo(cells[i], word[i], { dur: RUN, spin: 18, fill: ALP, easing: 'cubic-bezier(.13,.85,.2,1)' });
-      }, P2 + i * STAG);
+      }, P2 + i * STAG));
     })(i);
   }
   const p2done = P2 + (W - 1) * STAG + RUN;
 
-  // Fase 3 (hold ~1 s) -> Fase 4: rull tilbake til nedtellingen
-  setTimeout(function(){
-    const b = String(Math.max(0, secsIgjen()));
-    const bp = (' '.repeat(Math.max(0, W - b.length)) + b).slice(-W).split('');
-    for(let i = 0; i < W; i++){
+  // Fase 3 (hold ~1 s) -> Fase 4: bygg om til nedtellingens bredde og rull tilbake
+  lostTimers.push(setTimeout(function(){
+    const back = String(Math.max(0, secsIgjen()));
+    ensureCells(back.length, true);                        // naturlig antall sifre, ingen tomme ruter
+    const chars = back.split('');
+    for(let i = 0; i < chars.length; i++){
       (function(i){
-        setTimeout(function(){
-          rollTo(cells[i], bp[i], { dur: 1200, spin: 20, fill: DIG, easing: 'cubic-bezier(.2,.7,.2,1)' });
-        }, i * 110);
+        lostTimers.push(setTimeout(function(){
+          rollTo(cells[i], chars[i], { dur: 1200, spin: 20, fill: DIG, easing: 'cubic-bezier(.2,.7,.2,1)' });
+        }, i * 110));
       })(i);
     }
-    const done = (W - 1) * 110 + 1200 + 120;
-    setTimeout(function(){
+    const done = (chars.length - 1) * 110 + 1200 + 140;
+    lostTimers.push(setTimeout(function(){
       lostAnimating = false;
       lastLostVal = secsIgjen();
       const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
-      updateTimer();                                 // synk til eksakt tid
-    }, done);
-  }, p2done + 1000);
+      updateTimer();                                       // synk til eksakt tid
+    }, done));
+  }, p2done + 1000));
 }
 
 // ---------- Spørsmål ----------
