@@ -131,9 +131,9 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Reel-animasjon. Spinn: kun 0-9 + A-Z (aldri blankt). Landing: ruller rett paa
-  // maal-tegn, eller paa tomt kort for ledige ruter. Runde 1 = skjult ord (h->v),
-  // runde 2 = tilbake til nedtelling (h->v); hvert siffer teller live naar det lander.
+  // Reel-animasjon. Spinn = "Lost"-tegn (hieroglyfer). Landing: ruller rett paa
+  // maal-tegn (bokstav i runde 1, siffer i runde 2) eller tomt kort for ledige ruter.
+  // Sommlos start/retur: hver rute starter paa det den viser (siffer/bokstav/blank).
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
   cancelAnimationFrame(lostRAF);
@@ -143,8 +143,8 @@ function lostAnim(){
   ensureCells(W, true);
   const H = cells[0].el.getBoundingClientRect().height || 1;
 
-  const BASE = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';   // spinnsett (ingen blank)
-  const BN = BASE.length;
+  const LOST = ['\u{13080}','\u{13191}','\u{13214}','\u{13296}','\u{13077}','\u{130F0}','\u{1339B}','\u{13193}','\u{13153}','\u{1340D}','\u{133CF}','\u{132F9}'];
+  const LN = LOST.length;
   const ACC = 0.55, DEC = 0.95, VMAX = 26, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
   function ordMaal(){
@@ -158,31 +158,40 @@ function lostAnim(){
     return (' '.repeat(Math.max(0, W - b.length)) + b).slice(-W).split('');
   }
   function cruise(pl, tt){
-    let p = pl.pos0;
+    let p = 0;
     if(tt <= pl.tStart) return p;
     const a = Math.min(tt, pl.tStart + ACC) - pl.tStart;
     if(a > 0) p += 0.5 * (VMAX/ACC) * a * a;
     if(tt > pl.tStart + ACC) p += VMAX * (tt - (pl.tStart + ACC));
     return p;
   }
-  function spinStrip(pl){ pl.reel.style.transition='none'; pl.reel.innerHTML=(BASE+BASE).split('').map(function(c){return '<div class="g">'+c+'</div>';}).join(''); }
-  function setSpin(pl, tt){
-    const off = ((cruise(pl, tt) % BN) + BN) % BN;
+  function G(x){ return '<div class="g">' + esc(x) + '</div>'; }
+  function spinStrip(pl){                      // [start-glyf] + Lost + Lost
+    const arr = [pl.initGlyph].concat(LOST).concat(LOST);
     pl.reel.style.transition = 'none';
-    pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+    pl.reel.innerHTML = arr.map(G).join('');
+  }
+  function spinOff(pl, tt){                     // pos<1: rull fra start-glyf inn i Lost; ellers spinn Lost
+    const pos = cruise(pl, tt);
+    return (pos < 1) ? pos : 1 + ((pos - 1) % LN);
+  }
+  function setSpin(pl, tt){
+    pl.reel.style.transition = 'none';
+    pl.reel.style.transform = 'translateY(' + (-spinOff(pl, tt) * H) + 'px)';
   }
   function setDecel(pl, tt){
     if(!pl.landBuilt){
       pl.landBuilt = true;
-      const offD = ((cruise(pl, pl.tDecel) % BN) + BN) % BN;
-      const curIdx = Math.floor(offD);
-      pl.startFrac = offD - curIdx;
-      const g = [ BASE[curIdx % BN] ];
-      for(let k = 0; k < 6; k++) g.push(BASE[Math.floor(Math.random()*BN)]);
-      g.push(pl.blank ? '' : pl.tgt);        // land rett paa maal / tomt kort
+      const off = spinOff(pl, pl.tDecel);
+      const curIdx = Math.floor(off);
+      pl.startFrac = off - curIdx;
+      const curGlyph = (curIdx === 0) ? pl.initGlyph : LOST[(curIdx - 1) % LN];
+      const g = [ curGlyph ];
+      for(let k = 0; k < 6; k++) g.push(LOST[Math.floor(Math.random()*LN)]);
+      g.push(pl.blank ? '' : pl.tgt);          // land paa maal / tomt kort
       pl.L = g.length;
       pl.reel.style.transition = 'none';
-      pl.reel.innerHTML = g.map(function(c){ return '<div class="g">' + esc(c) + '</div>'; }).join('');
+      pl.reel.innerHTML = g.map(G).join('');
     }
     const u = Math.min(1, (tt - pl.tDecel)/DEC);
     const e = 1 - Math.pow(1 - u, 3);
@@ -196,20 +205,19 @@ function lostAnim(){
     const old = pl.liveShown == null ? d : pl.liveShown;
     pl.liveShown = d;
     pl.reel.style.transition = 'none';
-    pl.reel.innerHTML = '<div class="g">' + esc(old) + '</div><div class="g">' + esc(d) + '</div>';
+    pl.reel.innerHTML = G(old) + G(d);
     pl.reel.style.transform = 'translateY(0)';
-    requestAnimationFrame(function(){                 // rull OPPOVER (som spinnet)
+    requestAnimationFrame(function(){          // rull OPPOVER som spinnet
       pl.reel.style.transition = 'transform .45s cubic-bezier(0,0,.2,1)';
       pl.reel.style.transform = 'translateY(' + (-H) + 'px)';
     });
   }
-  function mkPlan(c, i, tgt, initial){
+  function mkPlan(c, i, tgt, initGlyph){
     const rank = W - 1 - i;
-    const pl = { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''), pos0:0,
-                 tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
-                 landBuilt:false, doneDecel:false, live:false, liveShown:null };
-    if(initial != null){ const ii = BASE.indexOf(initial); if(ii >= 0) pl.pos0 = ii; }
-    return pl;
+    return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''),
+             initGlyph:(initGlyph==null?'':initGlyph),
+             tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
+             landBuilt:false, doneDecel:false, live:false, liveShown:null };
   }
 
   const word = ordMaal();
@@ -219,13 +227,13 @@ function lostAnim(){
   let cyc1 = null;
   if(word){
     cyc1 = cells.map(function(c,i){ return mkPlan(c, i, word[i], startStr[i]); });
-    cyc1.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });   // sommlos start: naavaerende siffer
+    cyc1.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
   }
   let cyc2 = null;
   function buildCyc2(){
-    const init = word ? word : startStr.split('');
-    cyc2 = cells.map(function(c,i){ return mkPlan(c, i, null, (init[i]===' '?null:init[i])); });
-    cyc2.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });   // fortsett fra det som vises
+    const init = word ? word : startStr.split('');   // start fra det som vises (bokstav eller blank)
+    cyc2 = cells.map(function(c,i){ return mkPlan(c, i, null, (init[i]===' '?'':init[i])); });
+    cyc2.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
   }
 
   const t0 = performance.now();
