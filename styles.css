@@ -147,7 +147,7 @@ input {
     transition: text-shadow .2s ease;
 }
 
-/* ---------- Flip-klokke ---------- */
+/* ---------- Odometer-rulle ---------- */
 .flip{
   /* --cw = rutebredde. Skalerer med skjermen slik at minst 8 ruter faar plass
      i portrett, men aldri stoerre enn 64px paa store skjermer. */
@@ -159,35 +159,27 @@ input {
   max-width:100vw;
 }
 .flip .cell{
-  /* fast rute som styrer plass + symbolskalering, men uten kort-utseende */
   position:relative;
   width:var(--cw);
   height:calc(var(--cw) * 1.45);
+  overflow:hidden;                 /* maske: kun ett tegn synlig av rullen */
 }
-.flip .cell .face{
+.flip .cell .reel{
+  position:absolute;
+  left:0;
+  top:0;
   width:100%;
-  height:100%;
+  will-change:transform;
+}
+.flip .cell .reel .g{
+  height:calc(var(--cw) * 1.45);   /* hver glyf like hoy som ruten */
   display:flex;
   align-items:center;
   justify-content:center;
-  transform-origin:center center;
-}
-.flip .cell.flipin .face{
-  animation:flipIn .30s ease;
-}
-@keyframes flipIn{
-  0%   { transform:perspective(220px) rotateX(-88deg); opacity:.15; }
-  55%  { opacity:1; }
-  100% { transform:perspective(220px) rotateX(0deg);   opacity:1; }
-}
-.flip .cell .sym{
-  display:inline-block;
-  font-size:calc(var(--cw) * 0.82);
+  font-size:calc(var(--cw) * 0.8);
   line-height:1;
   color:#E8C15F;
-  transform-origin:center center;
-  will-change:transform;
 }
-.flip.lost .cell .sym{
+.flip.lost .cell .reel .g{
   text-shadow:0 0 14px rgba(232,193,95,.85), 0 0 30px rgba(232,193,95,.45);
 }
