@@ -150,7 +150,7 @@ function lostAnim(){
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
     if(!w) return null;
-    if(W >= w.length){ const pad = W - w.length, lp = Math.floor(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); }
+    if(W >= w.length) return (' '.repeat(W - w.length) + w).split('');   // hoyrejuster -> tomme kort til venstre, aldri paa siste rute
     return w.slice(0, W).split('');
   }
   function liveStr(){
