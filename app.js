@@ -145,12 +145,12 @@ function lostAnim(){
 
   const LOST = ['\u{13080}','\u{13191}','\u{13214}','\u{13296}','\u{13077}','\u{130F0}','\u{1339B}','\u{13193}','\u{13153}','\u{1340D}','\u{133CF}','\u{132F9}'];
   const LN = LOST.length;
-  const ACC = 0.55, DEC = 0.95, VMAX = 26, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
+  const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
     if(!w) return null;
-    if(W >= w.length) return (' '.repeat(W - w.length) + w).split('');   // hoyrejuster -> tomme kort til venstre, aldri paa siste rute
+    if(W >= w.length){ const pad = W - w.length, lp = Math.ceil(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); }   // sentrert (ekstra tomt kort til venstre)
     return w.slice(0, W).split('');
   }
   function liveStr(){
@@ -258,14 +258,33 @@ function lostAnim(){
     if(allLive){
       lostAnimating = false;
       lastLostVal = secsIgjen();
-      cells.forEach(function(c, i){ c.cur = (cyc2[i] ? (cyc2[i].liveShown || null) : null); });
-      const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
+      settTimerRent();                 // enkelt-glyf pr rute -> taaler rotasjon
       return;
     }
     lostRAF = requestAnimationFrame(frame);
   }
   lostRAF = requestAnimationFrame(frame);
 }
+
+// Tegn nedtellingen som rene enkelt-glyf-ruter (ingen rest-striper) - robust ved rotasjon.
+function settTimerRent(){
+  const s = String(Math.max(0, secsIgjen()));
+  cellCount = -1; ensureCells(s.length, false);
+  for(let i = 0; i < s.length; i++){
+    cells[i].cur = s[i];
+    cells[i].reel.style.transition = 'none';
+    cells[i].reel.innerHTML = '<div class="g">' + esc(s[i]) + '</div>';
+    cells[i].reel.style.transform = 'translateY(0)';
+  }
+}
+function reflow(){
+  if(lostAnimating){ cancelAnimationFrame(lostRAF); lostTimers.forEach(clearTimeout); lostTimers = []; lostAnimating = false; const f = content.querySelector('.flip'); if(f) f.classList.remove('lost'); }
+  if(currentType !== 'countdown') return;
+  settTimerRent();
+}
+var _reflowT;
+window.addEventListener('resize', function(){ clearTimeout(_reflowT); _reflowT = setTimeout(reflow, 150); });
+window.addEventListener('orientationchange', function(){ clearTimeout(_reflowT); _reflowT = setTimeout(reflow, 250); });
 
 // ---------- Spørsmål ----------
 function presentInputUI(question, hint){

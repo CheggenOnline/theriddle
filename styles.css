@@ -1,21 +1,32 @@
-html {
-    height: 100%;
-    overflow: hidden;
+*{ box-sizing:border-box; }
 
-}
-
-body {
+/* Bakgrunnen ligger paa html OG body, begge fyller viewporten. body er festet
+   (position:fixed) slik at den alltid dekker hele skjermen ogsaa ved rotasjon
+   og naar adressefeltet skjules/vises. */
+html, body {
     margin: 0;
     padding: 0;
+    width: 100%;
     height: 100%;
-      
-    background-image: radial-gradient(circle farthest-corner at center, #3C4B57 0%, #1C262B 100%);
-      
+    overflow: hidden;
+    background: radial-gradient(circle farthest-corner at center, #3C4B57 0%, #1C262B 100%);
+}
+body {
+    position: fixed;
+    inset: 0;
+}
+
+#Matrix {
+    position: fixed;
+    inset: 0;
+    width: 100%;
+    height: 100%;
+    display: block;
 }
 
 #contentWrapper{
-    height:100%;
-    width:100%;
+    position: fixed;
+    inset: 0;
 }
 
 #content{
@@ -24,6 +35,8 @@ body {
   top: 50%;
   -webkit-transform: translate(-50%, -50%);
   transform: translate(-50%, -50%);
+  max-width: 100vw;
+  padding: 0 8px;
 }
 
 input {
