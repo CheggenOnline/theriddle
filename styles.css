@@ -167,16 +167,6 @@ input {
   border-radius:3px;
   box-shadow:inset 0 0 0 1.5px rgba(0,0,0,.9), 0 1px 2px rgba(0,0,0,.45);   /* tynn svart ramme */
 }
-.flip .cell::after{               /* tynn midtlinje = mekanikk-illusjon */
-  content:'';
-  position:absolute;
-  left:0; right:0; top:50%;
-  height:1px;
-  transform:translateY(-.5px);
-  background:rgba(0,0,0,.55);
-  z-index:2;
-  pointer-events:none;
-}
 .flip .cell .reel{
   position:absolute;
   left:0;
@@ -192,7 +182,4 @@ input {
   font-size:calc(var(--cw) * 0.9);
   line-height:1;
   color:#E8C15F;
-}
-.flip.lost .cell .reel .g{
-  text-shadow:0 0 14px rgba(232,193,95,.85), 0 0 30px rgba(232,193,95,.45);
 }

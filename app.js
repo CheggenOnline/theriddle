@@ -131,9 +131,8 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Reel-animasjon: hver rute spinner opp (h.->v., 0,5 s forskjell, med akselerasjon),
-  // alle spinner, saa bremser de ned en og en (h.->v.) og avsloerer det skjulte ordet.
-  // Ordet holdes et oeyeblikk, saa gjentas hele prosessen og lander paa nedtellingen.
+  // Reel-animasjon. Runde 1: avslor skjult ord (h->v). Runde 2: spinn tilbake til
+  // nedtellingen (h->v); hvert siffer teller live saa snart det lander.
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
   cancelAnimationFrame(lostRAF);
@@ -145,17 +144,18 @@ function lostAnim(){
 
   const DIG = '0123456789';
   const LET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const BASE = DIG + LET;                 // felles spinnsett (ingen mellomrom -> ingen "blank"-glimt)
   const ACC = 0.55, DEC = 0.95, VMAX = 26, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
     if(!w) return null;
-    if(W >= w.length){ const pad = W - w.length, lp = Math.floor(pad/2); return ('*'.repeat(lp) + w + '*'.repeat(pad-lp)).split(''); }
+    if(W >= w.length){ const pad = W - w.length, lp = Math.floor(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); } // blanke ruter (ingen *)
     return w.slice(0, W).split('');
   }
-  function tallMaal(){
-    const back = String(Math.max(0, secsIgjen()));
-    return (' '.repeat(Math.max(0, W - back.length)) + back).slice(-W).split('');
+  function liveStr(){
+    const b = String(Math.max(0, secsIgjen()));
+    return (' '.repeat(Math.max(0, W - b.length)) + b).slice(-W).split('');
   }
   function cruise(pl, tt){
     let p = pl.pos0;
@@ -165,69 +165,99 @@ function lostAnim(){
     if(tt > pl.tStart + ACC) p += VMAX * (tt - (pl.tStart + ACC));
     return p;
   }
+  function alignFinal(pl){
+    let baseP = pl.pDecel + VMAX * DEC * 0.45;
+    let fp = Math.ceil(baseP);
+    fp += (((pl.idx - (fp % pl.n)) % pl.n) + pl.n) % pl.n;
+    return fp;
+  }
   function posAt(pl, tt){
-    if(tt < pl.tDecel) return cruise(pl, tt);
+    if(tt < pl.tDecel || pl.finalPos == null) return cruise(pl, Math.min(tt, pl.tDecel));
     const u = Math.min(1, (tt - pl.tDecel)/DEC);
     const e = 1 - Math.pow(1 - u, 3);
     return pl.pDecel + (pl.finalPos - pl.pDecel) * e;
   }
-  function buildStrip(c, set){
-    c.reel.style.transition = 'none';
-    c.reel.innerHTML = (set + set).split('').map(function(ch){ return '<div class="g">' + esc(ch) + '</div>'; }).join('');
+  function buildStrip(pl){
+    pl.reel.style.transition = 'none';
+    pl.reel.innerHTML = (pl.set + pl.set).split('').map(function(ch){ return '<div class="g">' + esc(ch) + '</div>'; }).join('');
   }
-  function buildCycle(targets, base, initials){
-    const plans = cells.map(function(c, i){
-      const rank = W - 1 - i;
-      const tStart = rank * STAG;
-      const allSpin = (W - 1) * STAG + ACC;
-      const tDecel = allSpin + CRUISE + rank * STAG;
-      const tgt = targets[i];
-      let set = base.indexOf(tgt) >= 0 ? base : base + tgt;
-      let pos0 = 0; if(initials){ const ii = set.indexOf(initials[i]); if(ii >= 0) pos0 = ii; }
-      return { c:c, tStart:tStart, tDecel:tDecel, set:set, n:set.length, idx:set.indexOf(tgt), pos0:pos0 };
-    });
-    plans.forEach(function(pl){
-      pl.pDecel = cruise(pl, pl.tDecel);
-      let baseP = pl.pDecel + VMAX * DEC * 0.45;
-      let fp = Math.ceil(baseP);
-      fp += (((pl.idx - (fp % pl.n)) % pl.n) + pl.n) % pl.n;
-      pl.finalPos = fp;
-    });
-    return { plans:plans, cycleEnd:(W - 1) * STAG + ACC + CRUISE + (W - 1) * STAG + DEC };
-  }
-  function draw(pl, tt){
-    const pos = posAt(pl, tt);
+  function setY(pl, pos){
     const off = ((pos % pl.n) + pl.n) % pl.n;
-    pl.c.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+    pl.reel.style.transition = 'none';
+    pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+  }
+  function plan(c, i, tgt, initial){
+    const rank = W - 1 - i;
+    let set = BASE;
+    if(tgt != null && set.indexOf(tgt) < 0) set += tgt;
+    if(initial != null && set.indexOf(initial) < 0) set += initial;
+    const pl = { c:c, reel:c.reel, set:set, n:set.length, tgt:tgt, idx:(tgt!=null?set.indexOf(tgt):0),
+                 pos0:0, tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
+                 pDecel:null, finalPos:null, live:false, liveShown:null };
+    if(initial != null){ const ii = set.indexOf(initial); if(ii >= 0) pl.pos0 = ii; }
+    return pl;
   }
 
   const word = ordMaal();
-  const cyc1 = word ? buildCycle(word, DIG + LET, startStr.split('')) : null;
-  const cyc2Start = cyc1 ? (cyc1.cycleEnd + HOLD) : 0;
-  if(cyc1) cyc1.plans.forEach(function(pl){ buildStrip(pl.c, pl.set); });
-  let cyc2 = null;
-  const t0 = performance.now();
+  const cycEnd = (W-1)*STAG + ACC + CRUISE + (W-1)*STAG + DEC;
+  const cyc2Start = word ? (cycEnd + HOLD) : 0;
 
+  // Runde 1: fra naavaerende siffer -> skjult ord (sommlos start: tegn straks paa pos0)
+  let cyc1 = null;
+  if(word){
+    cyc1 = cells.map(function(c,i){ return plan(c, i, word[i], startStr[i]); });
+    cyc1.forEach(function(pl){ pl.pDecel = cruise(pl, pl.tDecel); pl.finalPos = alignFinal(pl); buildStrip(pl); setY(pl, pl.pos0); });
+  }
+
+  let cyc2 = null;
+  function buildCyc2(){
+    const init = word ? word : startStr.split('');     // fortsett fra det som vises (ingen hopp til 0)
+    cyc2 = cells.map(function(c,i){ return plan(c, i, null, init[i]); });
+    cyc2.forEach(function(pl){ buildStrip(pl); setY(pl, pl.pos0); });
+  }
+
+  const t0 = performance.now();
   function frame(now){
     const t = (now - t0) / 1000;
     if(cyc1 && t < cyc2Start){
-      cyc1.plans.forEach(function(pl){ draw(pl, t); });
+      cyc1.forEach(function(pl){ setY(pl, posAt(pl, t)); });
       lostRAF = requestAnimationFrame(frame); return;
     }
-    if(!cyc2){
-      cyc2 = buildCycle(tallMaal(), DIG + ' ', null);
-      cyc2.plans.forEach(function(pl){ buildStrip(pl.c, pl.set); });
-    }
+    if(!cyc2) buildCyc2();
     const t2 = t - cyc2Start;
-    if(t2 < cyc2.cycleEnd){
-      cyc2.plans.forEach(function(pl){ draw(pl, t2); });
-      lostRAF = requestAnimationFrame(frame); return;
+    const ls = liveStr();
+    let allLive = true;
+    cyc2.forEach(function(pl, i){
+      if(pl.live){
+        const d = ls[i];
+        if(d !== pl.liveShown){
+          pl.liveShown = d;
+          if(pl.set.indexOf(d) < 0){ pl.set += d; buildStrip(pl); }
+          const idx = pl.set.indexOf(d);
+          pl.reel.style.transition = 'transform .45s cubic-bezier(0,0,.2,1)';
+          pl.reel.style.transform = 'translateY(' + (-idx * H) + 'px)';
+        }
+        return;
+      }
+      allLive = false;
+      if(t2 >= pl.tDecel && pl.finalPos == null){
+        pl.pDecel = cruise(pl, pl.tDecel);
+        const d = ls[i];
+        if(pl.set.indexOf(d) < 0){ pl.set += d; buildStrip(pl); }
+        pl.tgt = d; pl.idx = pl.set.indexOf(d);
+        pl.finalPos = alignFinal(pl);
+      }
+      setY(pl, posAt(pl, t2));
+      if(pl.finalPos != null && t2 >= pl.tDecel + DEC){ pl.live = true; pl.liveShown = pl.tgt; }
+    });
+    if(allLive){
+      lostAnimating = false;
+      lastLostVal = secsIgjen();
+      cells.forEach(function(c, i){ c.cur = (cyc2[i] ? cyc2[i].liveShown : null); });
+      const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
+      return;    // normal refreshTimer overtar neste sekund (ingen full rebuild -> ingen hopp)
     }
-    lostAnimating = false;
-    lastLostVal = secsIgjen();
-    cells.forEach(function(c){ c.cur = null; });
-    const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
-    updateTimer();
+    lostRAF = requestAnimationFrame(frame);
   }
   lostRAF = requestAnimationFrame(frame);
 }
