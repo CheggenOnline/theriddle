@@ -35,7 +35,7 @@ async function loadState(){
     const s = await fetch(API + '/state', { cache:'no-store' }).then(r=>r.json());
     currentTask = s.task; currentType = s.type;
     if(s.type === 'final'){ window.location.href = s.redirect || 'thePrice'; return; }
-    if(s.type === 'countdown'){ currentT0 = s.countdownTo; runCountdown(); return; }
+    if(s.type === 'countdown'){ currentT0 = s.countdownTo; currentOrd = s.ord || ''; runCountdown(); return; }
     if(s.type === 'question'){ presentInputUI(s.question || '', s.hint || ''); return; }
     content.innerHTML = '<div class="timer">…</div>';
   }catch(e){
@@ -54,6 +54,8 @@ function stopCountdown(){ if(refreshTimer){ clearInterval(refreshTimer); refresh
 var lostAnimating = false;
 var lastLostVal = null;
 var lostTimers = [];
+var currentOrd = '';
+var lostRAF = 0;
 // ---------- Odometer-rulle (fungerer med baade sifre, bokstaver og *) ----------
 var cells = [], cellCount = 0;
 function getFlip(){
@@ -129,62 +131,105 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Odometer-sekvens. Bruker kun like mange ruter som tallet paa skjermen.
-  // "riddle" sentreres med "*" hvis det er ekstra plass; er det for faa ruter
-  // skrives bare saa mye av ordet som faar plass.
+  // Reel-animasjon: hver rute spinner opp (h.->v., 0,5 s forskjell, med akselerasjon),
+  // alle spinner, saa bremser de ned en og en (h.->v.) og avsloerer det skjulte ordet.
+  // Ordet holdes et oeyeblikk, saa gjentas hele prosessen og lander paa nedtellingen.
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
+  cancelAnimationFrame(lostRAF);
+
   const startStr = String(Math.max(0, secsIgjen()));
-  const W = startStr.length;                       // like mange ruter som tallet
-  const WORD = 'riddle';
-  let target;
-  if(W >= WORD.length){
-    const pad = W - WORD.length, lp = Math.floor(pad / 2), rp = pad - lp;
-    target = '*'.repeat(lp) + WORD + '*'.repeat(rp);
-  } else {
-    target = WORD.slice(0, W);                      // saa mye som faar plass
-  }
-  const word = target.split('');
-  const DIG = '0123456789';
-  const ALP = 'abcdefghijklmnopqrstuvwxyz*!?#@&';
+  const W = startStr.length;
   ensureCells(W, true);
+  const H = cells[0].el.getBoundingClientRect().height || 1;
 
-  // Fase 1: alle ruller tall (~2 s) og lander paa tilfeldige sifre
-  for(let i = 0; i < W; i++)
-    rollTo(cells[i], DIG[Math.floor(Math.random() * 10)],
-           { dur: 2200, spin: 12, fill: DIG, delay: i * 45, easing: 'cubic-bezier(.1,.5,.2,1)' });
+  const DIG = '0123456789';
+  const LET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
+  const ACC = 0.55, DEC = 0.95, VMAX = 26, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
-  // Fase 2: en og en ruller gjennom bokstaver/spesialtegn og lander paa ordet
-  const P2 = 2350, STAG = 300, RUN = 1500;
-  for(let i = 0; i < W; i++){
-    (function(i){
-      lostTimers.push(setTimeout(function(){
-        rollTo(cells[i], word[i], { dur: RUN, spin: 9, fill: ALP, easing: 'cubic-bezier(.1,.5,.2,1)' });
-      }, P2 + i * STAG));
-    })(i);
+  function ordMaal(){
+    let w = (currentOrd || '').trim().toUpperCase();
+    if(!w) return null;
+    if(W >= w.length){ const pad = W - w.length, lp = Math.floor(pad/2); return ('*'.repeat(lp) + w + '*'.repeat(pad-lp)).split(''); }
+    return w.slice(0, W).split('');
   }
-  const p2done = P2 + (W - 1) * STAG + RUN;
-
-  // Fase 3 (hold ~1 s) -> Fase 4: rull tilbake til nedtellingen
-  lostTimers.push(setTimeout(function(){
+  function tallMaal(){
     const back = String(Math.max(0, secsIgjen()));
-    ensureCells(back.length, true);
-    const chars = back.split('');
-    for(let i = 0; i < chars.length; i++){
-      (function(i){
-        lostTimers.push(setTimeout(function(){
-          rollTo(cells[i], chars[i], { dur: 1500, spin: 11, fill: DIG, easing: 'cubic-bezier(.1,.5,.2,1)' });
-        }, i * 110));
-      })(i);
+    return (' '.repeat(Math.max(0, W - back.length)) + back).slice(-W).split('');
+  }
+  function cruise(pl, tt){
+    let p = pl.pos0;
+    if(tt <= pl.tStart) return p;
+    const a = Math.min(tt, pl.tStart + ACC) - pl.tStart;
+    if(a > 0) p += 0.5 * (VMAX/ACC) * a * a;
+    if(tt > pl.tStart + ACC) p += VMAX * (tt - (pl.tStart + ACC));
+    return p;
+  }
+  function posAt(pl, tt){
+    if(tt < pl.tDecel) return cruise(pl, tt);
+    const u = Math.min(1, (tt - pl.tDecel)/DEC);
+    const e = 1 - Math.pow(1 - u, 3);
+    return pl.pDecel + (pl.finalPos - pl.pDecel) * e;
+  }
+  function buildStrip(c, set){
+    c.reel.style.transition = 'none';
+    c.reel.innerHTML = (set + set).split('').map(function(ch){ return '<div class="g">' + esc(ch) + '</div>'; }).join('');
+  }
+  function buildCycle(targets, base, initials){
+    const plans = cells.map(function(c, i){
+      const rank = W - 1 - i;
+      const tStart = rank * STAG;
+      const allSpin = (W - 1) * STAG + ACC;
+      const tDecel = allSpin + CRUISE + rank * STAG;
+      const tgt = targets[i];
+      let set = base.indexOf(tgt) >= 0 ? base : base + tgt;
+      let pos0 = 0; if(initials){ const ii = set.indexOf(initials[i]); if(ii >= 0) pos0 = ii; }
+      return { c:c, tStart:tStart, tDecel:tDecel, set:set, n:set.length, idx:set.indexOf(tgt), pos0:pos0 };
+    });
+    plans.forEach(function(pl){
+      pl.pDecel = cruise(pl, pl.tDecel);
+      let baseP = pl.pDecel + VMAX * DEC * 0.45;
+      let fp = Math.ceil(baseP);
+      fp += (((pl.idx - (fp % pl.n)) % pl.n) + pl.n) % pl.n;
+      pl.finalPos = fp;
+    });
+    return { plans:plans, cycleEnd:(W - 1) * STAG + ACC + CRUISE + (W - 1) * STAG + DEC };
+  }
+  function draw(pl, tt){
+    const pos = posAt(pl, tt);
+    const off = ((pos % pl.n) + pl.n) % pl.n;
+    pl.c.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+  }
+
+  const word = ordMaal();
+  const cyc1 = word ? buildCycle(word, DIG + LET, startStr.split('')) : null;
+  const cyc2Start = cyc1 ? (cyc1.cycleEnd + HOLD) : 0;
+  if(cyc1) cyc1.plans.forEach(function(pl){ buildStrip(pl.c, pl.set); });
+  let cyc2 = null;
+  const t0 = performance.now();
+
+  function frame(now){
+    const t = (now - t0) / 1000;
+    if(cyc1 && t < cyc2Start){
+      cyc1.plans.forEach(function(pl){ draw(pl, t); });
+      lostRAF = requestAnimationFrame(frame); return;
     }
-    const done = (chars.length - 1) * 110 + 1500 + 160;
-    lostTimers.push(setTimeout(function(){
-      lostAnimating = false;
-      lastLostVal = secsIgjen();
-      const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
-      updateTimer();
-    }, done));
-  }, p2done + 1000));
+    if(!cyc2){
+      cyc2 = buildCycle(tallMaal(), DIG + ' ', null);
+      cyc2.plans.forEach(function(pl){ buildStrip(pl.c, pl.set); });
+    }
+    const t2 = t - cyc2Start;
+    if(t2 < cyc2.cycleEnd){
+      cyc2.plans.forEach(function(pl){ draw(pl, t2); });
+      lostRAF = requestAnimationFrame(frame); return;
+    }
+    lostAnimating = false;
+    lastLostVal = secsIgjen();
+    cells.forEach(function(c){ c.cur = null; });
+    const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
+    updateTimer();
+  }
+  lostRAF = requestAnimationFrame(frame);
 }
 
 // ---------- Spørsmål ----------

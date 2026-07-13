@@ -88,6 +88,7 @@ function tegn(){
           <input type="time" id="t-${id}" value="${isoTid(s.countdownTo)}" onchange="settDatoTid('${id}')">
         </div>
         <div class="sub" id="iso-${id}" style="margin-top:4px;">${esc(s.countdownTo)}</div>`;
+      h+=`<label>Skjult ord (vises i 100-animasjonen)</label><input value="${esc(s.ord)}" placeholder="f.eks. RIDDLE" oninput="CFG.steps['${id}'].ord=this.value">`;
       h+=`<label>Neste steg</label><input value="${esc(s.next)}" oninput="CFG.steps['${id}'].next=this.value">`;
     }else if(s.type==='question'){
       h+=`<label>Spørsmål</label><input value="${esc(s.question)}" oninput="CFG.steps['${id}'].question=this.value">`;
