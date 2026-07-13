@@ -131,8 +131,9 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Reel-animasjon. Runde 1: avslor skjult ord (h->v). Runde 2: spinn tilbake til
-  // nedtellingen (h->v); hvert siffer teller live saa snart det lander.
+  // Reel-animasjon. Spinn: kun 0-9 + A-Z (aldri blankt). Landing: ruller rett paa
+  // maal-tegn, eller paa tomt kort for ledige ruter. Runde 1 = skjult ord (h->v),
+  // runde 2 = tilbake til nedtelling (h->v); hvert siffer teller live naar det lander.
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
   cancelAnimationFrame(lostRAF);
@@ -142,15 +143,14 @@ function lostAnim(){
   ensureCells(W, true);
   const H = cells[0].el.getBoundingClientRect().height || 1;
 
-  const DIG = '0123456789';
-  const LET = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const BASE = DIG + LET;                 // felles spinnsett (ingen mellomrom -> ingen "blank"-glimt)
+  const BASE = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ';   // spinnsett (ingen blank)
+  const BN = BASE.length;
   const ACC = 0.55, DEC = 0.95, VMAX = 26, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
     if(!w) return null;
-    if(W >= w.length){ const pad = W - w.length, lp = Math.floor(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); } // blanke ruter (ingen *)
+    if(W >= w.length){ const pad = W - w.length, lp = Math.floor(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); }
     return w.slice(0, W).split('');
   }
   function liveStr(){
@@ -165,36 +165,50 @@ function lostAnim(){
     if(tt > pl.tStart + ACC) p += VMAX * (tt - (pl.tStart + ACC));
     return p;
   }
-  function alignFinal(pl){
-    let baseP = pl.pDecel + VMAX * DEC * 0.45;
-    let fp = Math.ceil(baseP);
-    fp += (((pl.idx - (fp % pl.n)) % pl.n) + pl.n) % pl.n;
-    return fp;
-  }
-  function posAt(pl, tt){
-    if(tt < pl.tDecel || pl.finalPos == null) return cruise(pl, Math.min(tt, pl.tDecel));
-    const u = Math.min(1, (tt - pl.tDecel)/DEC);
-    const e = 1 - Math.pow(1 - u, 3);
-    return pl.pDecel + (pl.finalPos - pl.pDecel) * e;
-  }
-  function buildStrip(pl){
-    pl.reel.style.transition = 'none';
-    pl.reel.innerHTML = (pl.set + pl.set).split('').map(function(ch){ return '<div class="g">' + esc(ch) + '</div>'; }).join('');
-  }
-  function setY(pl, pos){
-    const off = ((pos % pl.n) + pl.n) % pl.n;
+  function spinStrip(pl){ pl.reel.style.transition='none'; pl.reel.innerHTML=(BASE+BASE).split('').map(function(c){return '<div class="g">'+c+'</div>';}).join(''); }
+  function setSpin(pl, tt){
+    const off = ((cruise(pl, tt) % BN) + BN) % BN;
     pl.reel.style.transition = 'none';
     pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
   }
-  function plan(c, i, tgt, initial){
+  function setDecel(pl, tt){
+    if(!pl.landBuilt){
+      pl.landBuilt = true;
+      const offD = ((cruise(pl, pl.tDecel) % BN) + BN) % BN;
+      const curIdx = Math.floor(offD);
+      pl.startFrac = offD - curIdx;
+      const g = [ BASE[curIdx % BN] ];
+      for(let k = 0; k < 6; k++) g.push(BASE[Math.floor(Math.random()*BN)]);
+      g.push(pl.blank ? '' : pl.tgt);        // land rett paa maal / tomt kort
+      pl.L = g.length;
+      pl.reel.style.transition = 'none';
+      pl.reel.innerHTML = g.map(function(c){ return '<div class="g">' + esc(c) + '</div>'; }).join('');
+    }
+    const u = Math.min(1, (tt - pl.tDecel)/DEC);
+    const e = 1 - Math.pow(1 - u, 3);
+    const off = pl.startFrac + e * ((pl.L - 1) - pl.startFrac);
+    pl.reel.style.transition = 'none';
+    pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+    pl.doneDecel = (u >= 1);
+  }
+  function liveTick(pl, d){
+    if(d === pl.liveShown) return;
+    const old = pl.liveShown == null ? d : pl.liveShown;
+    pl.liveShown = d;
+    pl.reel.style.transition = 'none';
+    pl.reel.innerHTML = '<div class="g">' + esc(old) + '</div><div class="g">' + esc(d) + '</div>';
+    pl.reel.style.transform = 'translateY(0)';
+    requestAnimationFrame(function(){                 // rull OPPOVER (som spinnet)
+      pl.reel.style.transition = 'transform .45s cubic-bezier(0,0,.2,1)';
+      pl.reel.style.transform = 'translateY(' + (-H) + 'px)';
+    });
+  }
+  function mkPlan(c, i, tgt, initial){
     const rank = W - 1 - i;
-    let set = BASE;
-    if(tgt != null && set.indexOf(tgt) < 0) set += tgt;
-    if(initial != null && set.indexOf(initial) < 0) set += initial;
-    const pl = { c:c, reel:c.reel, set:set, n:set.length, tgt:tgt, idx:(tgt!=null?set.indexOf(tgt):0),
-                 pos0:0, tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
-                 pDecel:null, finalPos:null, live:false, liveShown:null };
-    if(initial != null){ const ii = set.indexOf(initial); if(ii >= 0) pl.pos0 = ii; }
+    const pl = { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''), pos0:0,
+                 tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
+                 landBuilt:false, doneDecel:false, live:false, liveShown:null };
+    if(initial != null){ const ii = BASE.indexOf(initial); if(ii >= 0) pl.pos0 = ii; }
     return pl;
   }
 
@@ -202,25 +216,23 @@ function lostAnim(){
   const cycEnd = (W-1)*STAG + ACC + CRUISE + (W-1)*STAG + DEC;
   const cyc2Start = word ? (cycEnd + HOLD) : 0;
 
-  // Runde 1: fra naavaerende siffer -> skjult ord (sommlos start: tegn straks paa pos0)
   let cyc1 = null;
   if(word){
-    cyc1 = cells.map(function(c,i){ return plan(c, i, word[i], startStr[i]); });
-    cyc1.forEach(function(pl){ pl.pDecel = cruise(pl, pl.tDecel); pl.finalPos = alignFinal(pl); buildStrip(pl); setY(pl, pl.pos0); });
+    cyc1 = cells.map(function(c,i){ return mkPlan(c, i, word[i], startStr[i]); });
+    cyc1.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });   // sommlos start: naavaerende siffer
   }
-
   let cyc2 = null;
   function buildCyc2(){
-    const init = word ? word : startStr.split('');     // fortsett fra det som vises (ingen hopp til 0)
-    cyc2 = cells.map(function(c,i){ return plan(c, i, null, init[i]); });
-    cyc2.forEach(function(pl){ buildStrip(pl); setY(pl, pl.pos0); });
+    const init = word ? word : startStr.split('');
+    cyc2 = cells.map(function(c,i){ return mkPlan(c, i, null, (init[i]===' '?null:init[i])); });
+    cyc2.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });   // fortsett fra det som vises
   }
 
   const t0 = performance.now();
   function frame(now){
     const t = (now - t0) / 1000;
     if(cyc1 && t < cyc2Start){
-      cyc1.forEach(function(pl){ setY(pl, posAt(pl, t)); });
+      cyc1.forEach(function(pl){ if(t < pl.tDecel) setSpin(pl, t); else setDecel(pl, t); });
       lostRAF = requestAnimationFrame(frame); return;
     }
     if(!cyc2) buildCyc2();
@@ -228,34 +240,19 @@ function lostAnim(){
     const ls = liveStr();
     let allLive = true;
     cyc2.forEach(function(pl, i){
-      if(pl.live){
-        const d = ls[i];
-        if(d !== pl.liveShown){
-          pl.liveShown = d;
-          if(pl.set.indexOf(d) < 0){ pl.set += d; buildStrip(pl); }
-          const idx = pl.set.indexOf(d);
-          pl.reel.style.transition = 'transform .45s cubic-bezier(0,0,.2,1)';
-          pl.reel.style.transform = 'translateY(' + (-idx * H) + 'px)';
-        }
-        return;
-      }
+      if(pl.live){ liveTick(pl, ls[i]); return; }
       allLive = false;
-      if(t2 >= pl.tDecel && pl.finalPos == null){
-        pl.pDecel = cruise(pl, pl.tDecel);
-        const d = ls[i];
-        if(pl.set.indexOf(d) < 0){ pl.set += d; buildStrip(pl); }
-        pl.tgt = d; pl.idx = pl.set.indexOf(d);
-        pl.finalPos = alignFinal(pl);
-      }
-      setY(pl, posAt(pl, t2));
-      if(pl.finalPos != null && t2 >= pl.tDecel + DEC){ pl.live = true; pl.liveShown = pl.tgt; }
+      if(t2 < pl.tDecel){ setSpin(pl, t2); return; }
+      if(!pl.landBuilt){ pl.tgt = (ls[i]===' '?'':ls[i]); pl.blank = (ls[i]===' '); }
+      setDecel(pl, t2);
+      if(pl.doneDecel){ pl.live = true; pl.liveShown = pl.blank ? '' : pl.tgt; }
     });
     if(allLive){
       lostAnimating = false;
       lastLostVal = secsIgjen();
-      cells.forEach(function(c, i){ c.cur = (cyc2[i] ? cyc2[i].liveShown : null); });
+      cells.forEach(function(c, i){ c.cur = (cyc2[i] ? (cyc2[i].liveShown || null) : null); });
       const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
-      return;    // normal refreshTimer overtar neste sekund (ingen full rebuild -> ingen hopp)
+      return;
     }
     lostRAF = requestAnimationFrame(frame);
   }
