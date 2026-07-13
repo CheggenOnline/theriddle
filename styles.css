@@ -173,7 +173,7 @@ input {
   transform-origin:center center;
 }
 .flip .cell.flipin .face{
-  animation:flipIn .22s ease;
+  animation:flipIn .30s ease;
 }
 @keyframes flipIn{
   0%   { transform:perspective(220px) rotateX(-88deg); opacity:.15; }

@@ -102,8 +102,8 @@ function updateTimer(){
   if(lostAnimating) return;                 // ikke overskriv mens animasjonen kjører
   const s = Math.floor(diff / 1000);
   visTid(String(s), false);
-  // hver gang telleren treffer et tall som slutter på tre nuller
-  if(s % 1000 === 0 && s !== lastLostVal){
+  // hver gang telleren treffer et tall som slutter på to nuller
+  if(s % 100 === 0 && s !== lastLostVal){
     lastLostVal = s;
     lostAnim();
   }
@@ -122,7 +122,7 @@ function lostAnim(){
   const ALPHA = 'abcdefghijklmnopqrstuvwxyz*!?#@&';
 
   // tidslinje (ms)
-  const STAG = 220, ALPHARUN = 520, TICK = 80;
+  const STAG = 330, ALPHARUN = 990, TICK = 333;   // flip 3 ganger i sekundet
   const p1end = 2000;                           // fase 1: alle spinner tall
   const switchT = [], lockT = [];
   for(let i = 0; i < W; i++){ switchT[i] = p1end + i * STAG; lockT[i] = switchT[i] + ALPHARUN; }
