@@ -161,7 +161,7 @@ input {
 .flip .cell{
   position:relative;
   width:var(--cw);
-  height:calc(var(--cw) * 1.45);
+  height:calc(var(--cw) * 1.12);
   overflow:hidden;                 /* maske: kun ett tegn synlig av rullen */
 }
 .flip .cell .reel{
@@ -172,11 +172,11 @@ input {
   will-change:transform;
 }
 .flip .cell .reel .g{
-  height:calc(var(--cw) * 1.45);   /* hver glyf like hoy som ruten */
+  height:calc(var(--cw) * 1.12);   /* hver glyf like hoy som ruten -> ingenting over/under */
   display:flex;
   align-items:center;
   justify-content:center;
-  font-size:calc(var(--cw) * 0.8);
+  font-size:calc(var(--cw) * 0.9);
   line-height:1;
   color:#E8C15F;
 }

@@ -77,7 +77,7 @@ function ensureCells(n, lost){
 function rollTo(c, target, o){
   o = o || {};
   const dur = o.dur || 550, spin = o.spin || 0, fill = o.fill || '0123456789';
-  const delay = o.delay || 0, easing = o.easing || 'cubic-bezier(.16,.84,.22,1)';
+  const delay = o.delay || 0, easing = o.easing || 'cubic-bezier(0,0,.2,1)';
   const seq = [ c.cur == null ? target : c.cur ];
   for(let i = 0; i < spin; i++) seq.push(fill[Math.floor(Math.random() * fill.length)]);
   seq.push(target);
@@ -104,7 +104,7 @@ function visTid(txt, lost){
   const str = String(txt);
   ensureCells(str.length, lost);
   for(let i = 0; i < str.length; i++){
-    if(cells[i].cur !== str[i]) rollTo(cells[i], str[i], { dur: 550, spin: 0 });
+    if(cells[i].cur !== str[i]) rollTo(cells[i], str[i], { dur: 820, spin: 0 });
   }
 }
 function secsIgjen(){
@@ -129,16 +129,22 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Odometer-sekvens: alle sifre ruller -> en og en ruller gjennom bokstaver/
-  // spesialtegn og lander paa "riddle" (ekstra ruter -> "*") -> holdes ~1 s ->
-  // ruller tilbake og lander paa naavaerende nedtelling.
+  // Odometer-sekvens. Bruker kun like mange ruter som tallet paa skjermen.
+  // "riddle" sentreres med "*" hvis det er ekstra plass; er det for faa ruter
+  // skrives bare saa mye av ordet som faar plass.
   lostAnimating = true;
-  lostTimers.forEach(clearTimeout); lostTimers = [];        // avbryt ev. tidligere kjoring
+  lostTimers.forEach(clearTimeout); lostTimers = [];
   const startStr = String(Math.max(0, secsIgjen()));
-  let W = Math.max(startStr.length, 6);
-  if((W - 6) % 2 === 1) W++;                                // symmetrisk *-padding
-  const lp = (W - 6) / 2, rp = W - 6 - lp;
-  const word = ('*'.repeat(lp) + 'riddle' + '*'.repeat(rp)).split('');
+  const W = startStr.length;                       // like mange ruter som tallet
+  const WORD = 'riddle';
+  let target;
+  if(W >= WORD.length){
+    const pad = W - WORD.length, lp = Math.floor(pad / 2), rp = pad - lp;
+    target = '*'.repeat(lp) + WORD + '*'.repeat(rp);
+  } else {
+    target = WORD.slice(0, W);                      // saa mye som faar plass
+  }
+  const word = target.split('');
   const DIG = '0123456789';
   const ALP = 'abcdefghijklmnopqrstuvwxyz*!?#@&';
   ensureCells(W, true);
@@ -146,37 +152,37 @@ function lostAnim(){
   // Fase 1: alle ruller tall (~2 s) og lander paa tilfeldige sifre
   for(let i = 0; i < W; i++)
     rollTo(cells[i], DIG[Math.floor(Math.random() * 10)],
-           { dur: 2000, spin: 24, fill: DIG, delay: i * 45, easing: 'cubic-bezier(.2,.7,.2,1)' });
+           { dur: 2200, spin: 12, fill: DIG, delay: i * 45, easing: 'cubic-bezier(.1,.5,.2,1)' });
 
   // Fase 2: en og en ruller gjennom bokstaver/spesialtegn og lander paa ordet
-  const P2 = 2150, STAG = 260, RUN = 1200;
+  const P2 = 2350, STAG = 300, RUN = 1500;
   for(let i = 0; i < W; i++){
     (function(i){
       lostTimers.push(setTimeout(function(){
-        rollTo(cells[i], word[i], { dur: RUN, spin: 18, fill: ALP, easing: 'cubic-bezier(.13,.85,.2,1)' });
+        rollTo(cells[i], word[i], { dur: RUN, spin: 9, fill: ALP, easing: 'cubic-bezier(.1,.5,.2,1)' });
       }, P2 + i * STAG));
     })(i);
   }
   const p2done = P2 + (W - 1) * STAG + RUN;
 
-  // Fase 3 (hold ~1 s) -> Fase 4: bygg om til nedtellingens bredde og rull tilbake
+  // Fase 3 (hold ~1 s) -> Fase 4: rull tilbake til nedtellingen
   lostTimers.push(setTimeout(function(){
     const back = String(Math.max(0, secsIgjen()));
-    ensureCells(back.length, true);                        // naturlig antall sifre, ingen tomme ruter
+    ensureCells(back.length, true);
     const chars = back.split('');
     for(let i = 0; i < chars.length; i++){
       (function(i){
         lostTimers.push(setTimeout(function(){
-          rollTo(cells[i], chars[i], { dur: 1200, spin: 20, fill: DIG, easing: 'cubic-bezier(.2,.7,.2,1)' });
+          rollTo(cells[i], chars[i], { dur: 1500, spin: 11, fill: DIG, easing: 'cubic-bezier(.1,.5,.2,1)' });
         }, i * 110));
       })(i);
     }
-    const done = (chars.length - 1) * 110 + 1200 + 140;
+    const done = (chars.length - 1) * 110 + 1500 + 160;
     lostTimers.push(setTimeout(function(){
       lostAnimating = false;
       lastLostVal = secsIgjen();
       const f = content.querySelector('.flip'); if(f) f.classList.remove('lost');
-      updateTimer();                                       // synk til eksakt tid
+      updateTimer();
     }, done));
   }, p2done + 1000));
 }
