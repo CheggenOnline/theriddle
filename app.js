@@ -183,7 +183,7 @@ function lostAnim(){
     return w.slice(0, W).split('');
   }
   function cruise(pl, tt){
-    let p = 0;
+    let p = pl.phase || 0;
     if(tt <= pl.tStart) return p;
     const a = Math.min(tt, pl.tStart + ACC) - pl.tStart;
     if(a > 0) p += 0.5 * (VMAX/ACC) * a * a;
@@ -239,7 +239,7 @@ function lostAnim(){
     const rank = W - 1 - i;
     return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''),
              initGlyph:(initGlyph==null||initGlyph===' '?'':initGlyph),
-             tStart:0, tDecel:ACC+CRUISE+rank*STAG,   // alle spinner fra start (ingen tom/ledig rute); rightmost lander foerst
+             tStart:0, tDecel:ACC+CRUISE+rank*STAG, phase:Math.random()*LN,   // alle spinner fra start (ingen tom rute), men ute av synk; rightmost lander foerst
              landBuilt:false, doneDecel:false, live:false, liveShown:null };
   }
 
