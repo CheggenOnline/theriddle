@@ -131,22 +131,28 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Reel-animasjon. Spinn = vanlige tall. Runde 1 viser det skjulte ordet i AKKURAT
-  // saa mange ruter som ordet (ingen tomme ruter), sentrert paa skjermen. Runde 2
-  // spinner tilbake til nedtellingen i sitt eget antall ruter. Hvert siffer teller
-  // live saa snart det lander.
+  // Fast antall ruter (= nedtellingens bredde) HELE tiden -> ingen ruter forsvinner.
+  // Hver rute starter spinnet fra det den viser (siffer/bokstav/blank) -> ingen reset til 0.
+  // Spinn = vanlige tall. Ordet sentreres; ekstra ruter er tomme kort.
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
   cancelAnimationFrame(lostRAF);
 
-  const LOST = '0123456789'.split('');       // spinn-tegn = tall (ikke Lost-ikoner)
+  const startStr = String(Math.max(0, secsIgjen()));
+  const W = startStr.length;
+  ensureCells(W, true);
+  const H = cells[0].el.getBoundingClientRect().height || 1;
+
+  const LOST = '0123456789'.split('');
   const LN = LOST.length;
   const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
-  let H = 0;
 
-  const wordRaw = (currentOrd || '').trim().toUpperCase();
-  const word = wordRaw ? wordRaw.split('') : null;
-
+  function ordMaal(){
+    let w = (currentOrd || '').trim().toUpperCase();
+    if(!w) return null;
+    if(W >= w.length){ const pad = W - w.length, lp = Math.ceil(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); }
+    return w.slice(0, W).split('');
+  }
   function cruise(pl, tt){
     let p = 0;
     if(tt <= pl.tStart) return p;
@@ -200,35 +206,42 @@ function lostAnim(){
       pl.reel.style.transform = 'translateY(' + (-H) + 'px)';
     });
   }
-  function makeCycle(targets){
-    const n = targets.length;
-    ensureCells(n, true);
-    H = cells[0].el.getBoundingClientRect().height || 1;
-    const plans = cells.map(function(c, i){
-      const rank = n - 1 - i, tgt = targets[i];
-      return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''), initGlyph:'0',
-               tStart:rank*STAG, tDecel:(n-1)*STAG+ACC+CRUISE+rank*STAG,
-               landBuilt:false, doneDecel:false, live:false, liveShown:null };
-    });
-    plans.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
-    return { plans:plans, cycEnd:(n-1)*STAG + ACC + CRUISE + (n-1)*STAG + DEC };
+  function mkPlan(c, i, tgt, initGlyph){
+    const rank = W - 1 - i;
+    return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''),
+             initGlyph:(initGlyph==null||initGlyph===' '?'':initGlyph),
+             tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
+             landBuilt:false, doneDecel:false, live:false, liveShown:null };
+  }
+
+  const word = ordMaal();
+  const cycEnd = (W-1)*STAG + ACC + CRUISE + (W-1)*STAG + DEC;
+  const cyc2Start = word ? (cycEnd + HOLD) : 0;
+
+  let cyc1 = null;
+  if(word){
+    cyc1 = cells.map(function(c,i){ return mkPlan(c, i, word[i], startStr[i]); });   // start fra nedtellingssiffer
+    cyc1.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
+  }
+  let cyc2 = null;
+  function buildCyc2(){
+    const init = word ? word : startStr.split('');    // start fra det som vises (bokstav/blank) -> ingen reset til 0
+    cyc2 = cells.map(function(c,i){ return mkPlan(c, i, null, init[i]); });
+    cyc2.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
   }
 
   const t0 = performance.now();
-  let cyc1 = null, cyc2 = null, cyc2Start = 0;
-  if(word){ cyc1 = makeCycle(word); cyc2Start = cyc1.cycEnd + HOLD; }
-
   function frame(now){
     const t = (now - t0) / 1000;
     if(cyc1 && t < cyc2Start){
-      cyc1.plans.forEach(function(pl){ if(t < pl.tDecel) setSpin(pl, t); else setDecel(pl, t); });
+      cyc1.forEach(function(pl){ if(t < pl.tDecel) setSpin(pl, t); else setDecel(pl, t); });
       lostRAF = requestAnimationFrame(frame); return;
     }
-    if(!cyc2) cyc2 = makeCycle(String(Math.max(0, secsIgjen())).split(''));
+    if(!cyc2) buildCyc2();
     const t2 = t - cyc2Start;
     const ls = String(Math.max(0, secsIgjen())).split('');
     let allLive = true;
-    cyc2.plans.forEach(function(pl, i){
+    cyc2.forEach(function(pl, i){
       if(pl.live){ liveTick(pl, ls[i]); return; }
       allLive = false;
       if(t2 < pl.tDecel){ setSpin(pl, t2); return; }
