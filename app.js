@@ -32,6 +32,13 @@ document.addEventListener('DOMContentLoaded', function () {
         '  anim ' + (typeof lostAnimating!=="undefined"?lostAnimating:"?") +
         '\nvisible: [' + vis + ']   ( . = tom rute, _ = ingen reel )';
     }, 250);
+    // I debug-modus: trykk hvor som helst for aa spille animasjonen (slipper aa vente paa 100-sekund)
+    document.addEventListener('click', function(){
+      if(typeof lostAnim==='function' && typeof currentType!=='undefined' && currentType==='countdown' && !lostAnimating){
+        lostAnimating=false; lastLostVal=null; lostAnim();
+      }
+    });
+    setTimeout(function(){ if(typeof lostAnim==='function' && typeof currentType!=='undefined' && currentType==='countdown' && !lostAnimating){ lastLostVal=null; lostAnim(); } }, 2500);
   }
   prepareCanvasAndDiv();
   loadState();
