@@ -143,7 +143,7 @@ function lostAnim(){
   ensureCells(W, true);
   const H = cells[0].el.getBoundingClientRect().height || 1;
 
-  const LOST = ['\u{13080}','\u{13191}','\u{13214}','\u{13296}','\u{13077}','\u{130F0}','\u{1339B}','\u{13193}','\u{13153}','\u{1340D}','\u{133CF}','\u{132F9}'];
+  const LOST = '0123456789'.split('');   // spinn med vanlige tall (ikke Lost-tegn)
   const LN = LOST.length;
   const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
