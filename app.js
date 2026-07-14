@@ -131,32 +131,22 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Reel-animasjon. Spinn = "Lost"-tegn (hieroglyfer). Landing: ruller rett paa
-  // maal-tegn (bokstav i runde 1, siffer i runde 2) eller tomt kort for ledige ruter.
-  // Sommlos start/retur: hver rute starter paa det den viser (siffer/bokstav/blank).
+  // Reel-animasjon. Spinn = vanlige tall. Runde 1 viser det skjulte ordet i AKKURAT
+  // saa mange ruter som ordet (ingen tomme ruter), sentrert paa skjermen. Runde 2
+  // spinner tilbake til nedtellingen i sitt eget antall ruter. Hvert siffer teller
+  // live saa snart det lander.
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
   cancelAnimationFrame(lostRAF);
 
-  const startStr = String(Math.max(0, secsIgjen()));
-  const W = startStr.length;
-  ensureCells(W, true);
-  const H = cells[0].el.getBoundingClientRect().height || 1;
-
-  const LOST = '0123456789'.split('');   // spinn med vanlige tall (ikke Lost-tegn)
+  const LOST = '0123456789'.split('');       // spinn-tegn = tall (ikke Lost-ikoner)
   const LN = LOST.length;
   const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
+  let H = 0;
 
-  function ordMaal(){
-    let w = (currentOrd || '').trim().toUpperCase();
-    if(!w) return null;
-    if(W >= w.length){ const pad = W - w.length, lp = Math.ceil(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); }   // sentrert (ekstra tomt kort til venstre)
-    return w.slice(0, W).split('');
-  }
-  function liveStr(){
-    const b = String(Math.max(0, secsIgjen()));
-    return (' '.repeat(Math.max(0, W - b.length)) + b).slice(-W).split('');
-  }
+  const wordRaw = (currentOrd || '').trim().toUpperCase();
+  const word = wordRaw ? wordRaw.split('') : null;
+
   function cruise(pl, tt){
     let p = 0;
     if(tt <= pl.tStart) return p;
@@ -166,29 +156,27 @@ function lostAnim(){
     return p;
   }
   function G(x){ return '<div class="g">' + esc(x) + '</div>'; }
-  function spinStrip(pl){                      // [start-glyf] + Lost + Lost
-    const arr = [pl.initGlyph].concat(LOST).concat(LOST);
+  function spinStrip(pl){
     pl.reel.style.transition = 'none';
-    pl.reel.innerHTML = arr.map(G).join('');
-  }
-  function spinOff(pl, tt){                     // pos<1: rull fra start-glyf inn i Lost; ellers spinn Lost
-    const pos = cruise(pl, tt);
-    return (pos < 1) ? pos : 1 + ((pos - 1) % LN);
+    pl.reel.innerHTML = [pl.initGlyph].concat(LOST).concat(LOST).map(G).join('');
   }
   function setSpin(pl, tt){
+    const pos = cruise(pl, tt);
+    const off = (pos < 1) ? pos : 1 + ((pos - 1) % LN);
     pl.reel.style.transition = 'none';
-    pl.reel.style.transform = 'translateY(' + (-spinOff(pl, tt) * H) + 'px)';
+    pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
   }
   function setDecel(pl, tt){
     if(!pl.landBuilt){
       pl.landBuilt = true;
-      const off = spinOff(pl, pl.tDecel);
+      const pos = cruise(pl, pl.tDecel);
+      const off = (pos < 1) ? pos : 1 + ((pos - 1) % LN);
       const curIdx = Math.floor(off);
       pl.startFrac = off - curIdx;
-      const curGlyph = (curIdx === 0) ? pl.initGlyph : LOST[(curIdx - 1) % LN];
-      const g = [ curGlyph ];
+      const cur = (curIdx === 0) ? pl.initGlyph : LOST[(curIdx - 1) % LN];
+      const g = [ cur ];
       for(let k = 0; k < 6; k++) g.push(LOST[Math.floor(Math.random()*LN)]);
-      g.push(pl.blank ? '' : pl.tgt);          // land paa maal / tomt kort
+      g.push(pl.blank ? '' : pl.tgt);
       pl.L = g.length;
       pl.reel.style.transition = 'none';
       pl.reel.innerHTML = g.map(G).join('');
@@ -201,64 +189,57 @@ function lostAnim(){
     pl.doneDecel = (u >= 1);
   }
   function liveTick(pl, d){
-    if(d === pl.liveShown) return;
+    if(d == null || d === pl.liveShown) return;
     const old = pl.liveShown == null ? d : pl.liveShown;
     pl.liveShown = d;
     pl.reel.style.transition = 'none';
     pl.reel.innerHTML = G(old) + G(d);
     pl.reel.style.transform = 'translateY(0)';
-    requestAnimationFrame(function(){          // rull OPPOVER som spinnet
+    requestAnimationFrame(function(){
       pl.reel.style.transition = 'transform .45s cubic-bezier(0,0,.2,1)';
       pl.reel.style.transform = 'translateY(' + (-H) + 'px)';
     });
   }
-  function mkPlan(c, i, tgt, initGlyph){
-    const rank = W - 1 - i;
-    return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''),
-             initGlyph:(initGlyph==null?'':initGlyph),
-             tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
-             landBuilt:false, doneDecel:false, live:false, liveShown:null };
-  }
-
-  const word = ordMaal();
-  const cycEnd = (W-1)*STAG + ACC + CRUISE + (W-1)*STAG + DEC;
-  const cyc2Start = word ? (cycEnd + HOLD) : 0;
-
-  let cyc1 = null;
-  if(word){
-    cyc1 = cells.map(function(c,i){ return mkPlan(c, i, word[i], startStr[i]); });
-    cyc1.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
-  }
-  let cyc2 = null;
-  function buildCyc2(){
-    const init = word ? word : startStr.split('');   // start fra det som vises (bokstav eller blank)
-    cyc2 = cells.map(function(c,i){ return mkPlan(c, i, null, (init[i]===' '?'':init[i])); });
-    cyc2.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
+  function makeCycle(targets){
+    const n = targets.length;
+    ensureCells(n, true);
+    H = cells[0].el.getBoundingClientRect().height || 1;
+    const plans = cells.map(function(c, i){
+      const rank = n - 1 - i, tgt = targets[i];
+      return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''), initGlyph:'0',
+               tStart:rank*STAG, tDecel:(n-1)*STAG+ACC+CRUISE+rank*STAG,
+               landBuilt:false, doneDecel:false, live:false, liveShown:null };
+    });
+    plans.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
+    return { plans:plans, cycEnd:(n-1)*STAG + ACC + CRUISE + (n-1)*STAG + DEC };
   }
 
   const t0 = performance.now();
+  let cyc1 = null, cyc2 = null, cyc2Start = 0;
+  if(word){ cyc1 = makeCycle(word); cyc2Start = cyc1.cycEnd + HOLD; }
+
   function frame(now){
     const t = (now - t0) / 1000;
     if(cyc1 && t < cyc2Start){
-      cyc1.forEach(function(pl){ if(t < pl.tDecel) setSpin(pl, t); else setDecel(pl, t); });
+      cyc1.plans.forEach(function(pl){ if(t < pl.tDecel) setSpin(pl, t); else setDecel(pl, t); });
       lostRAF = requestAnimationFrame(frame); return;
     }
-    if(!cyc2) buildCyc2();
+    if(!cyc2) cyc2 = makeCycle(String(Math.max(0, secsIgjen())).split(''));
     const t2 = t - cyc2Start;
-    const ls = liveStr();
+    const ls = String(Math.max(0, secsIgjen())).split('');
     let allLive = true;
-    cyc2.forEach(function(pl, i){
+    cyc2.plans.forEach(function(pl, i){
       if(pl.live){ liveTick(pl, ls[i]); return; }
       allLive = false;
       if(t2 < pl.tDecel){ setSpin(pl, t2); return; }
-      if(!pl.landBuilt){ pl.tgt = (ls[i]===' '?'':ls[i]); pl.blank = (ls[i]===' '); }
+      if(!pl.landBuilt){ pl.tgt = (ls[i] != null ? ls[i] : '0'); pl.blank = false; }
       setDecel(pl, t2);
-      if(pl.doneDecel){ pl.live = true; pl.liveShown = pl.blank ? '' : pl.tgt; }
+      if(pl.doneDecel){ pl.live = true; pl.liveShown = pl.tgt; }
     });
     if(allLive){
       lostAnimating = false;
       lastLostVal = secsIgjen();
-      settTimerRent();                 // enkelt-glyf pr rute -> taaler rotasjon
+      settTimerRent();
       return;
     }
     lostRAF = requestAnimationFrame(frame);
