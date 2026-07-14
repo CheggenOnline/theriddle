@@ -11,6 +11,28 @@ var currentT0 = '';
 var busy = false;
 
 document.addEventListener('DOMContentLoaded', function () {
+  if(/[?&]debug/i.test(location.search)){
+    var d = document.createElement('div');
+    d.id = 'dbg';
+    d.style.cssText = 'position:fixed;top:0;left:0;right:0;z-index:99999;background:rgba(0,0,0,.82);color:#5f5;font:12px/1.4 monospace;padding:6px 8px;white-space:pre-wrap;';
+    document.body.appendChild(d);
+    setInterval(function(){
+      var cs = document.querySelectorAll('.flip .cell');
+      var vis = Array.prototype.map.call(cs, function(c){
+        var r = c.querySelector('.reel'); if(!r || !r.children.length) return '_';
+        var H = c.getBoundingClientRect().height || 1;
+        var ty = parseFloat((String(r.style.transform).match(/-?[0-9.]+/) || [0])[0]) || 0;
+        var idx = Math.round(Math.abs(ty) / H);
+        var g = r.children[idx]; var t = g ? g.textContent : '?';
+        return t === '' ? '.' : t;
+      }).join('');
+      d.textContent = 'vp ' + window.innerWidth + 'x' + window.innerHeight +
+        '  cells ' + cs.length + '  ord "' + (typeof currentOrd!=="undefined"?currentOrd:"?") +
+        '"  type ' + (typeof currentType!=="undefined"?currentType:"?") +
+        '  anim ' + (typeof lostAnimating!=="undefined"?lostAnimating:"?") +
+        '\nvisible: [' + vis + ']   ( . = tom rute, _ = ingen reel )';
+    }, 250);
+  }
   prepareCanvasAndDiv();
   loadState();
 });
@@ -150,7 +172,7 @@ function lostAnim(){
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
     if(!w) return null;
-    if(W >= w.length){ const pad = W - w.length, lp = Math.ceil(pad/2); return (' '.repeat(lp) + w + ' '.repeat(pad-lp)).split(''); }
+    if(W >= w.length) return (' '.repeat(W - w.length) + w).split('');   // hoyrejuster: tomme kort til venstre, siste rute alltid en bokstav
     return w.slice(0, W).split('');
   }
   function cruise(pl, tt){
