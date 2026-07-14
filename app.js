@@ -174,7 +174,7 @@ function lostAnim(){
 
   const LOST = '0123456789'.split('');
   const LN = LOST.length;
-  const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
+  const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 1.3, HOLD = 0.9;
 
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
@@ -239,12 +239,12 @@ function lostAnim(){
     const rank = W - 1 - i;
     return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''),
              initGlyph:(initGlyph==null||initGlyph===' '?'':initGlyph),
-             tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
+             tStart:0, tDecel:ACC+CRUISE+rank*STAG,   // alle spinner fra start (ingen tom/ledig rute); rightmost lander foerst
              landBuilt:false, doneDecel:false, live:false, liveShown:null };
   }
 
   const word = ordMaal();
-  const cycEnd = (W-1)*STAG + ACC + CRUISE + (W-1)*STAG + DEC;
+  const cycEnd = ACC + CRUISE + (W-1)*STAG + DEC;
   const cyc2Start = word ? (cycEnd + HOLD) : 0;
 
   let cyc1 = null;
