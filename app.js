@@ -160,9 +160,9 @@ function updateTimer(){
   }
 }
 function lostAnim(){
-  // Fast antall ruter (= nedtellingens bredde) HELE tiden -> ingen ruter forsvinner.
-  // Hver rute starter spinnet fra det den viser (siffer/bokstav/blank) -> ingen reset til 0.
-  // Spinn = vanlige tall. Ordet sentreres; ekstra ruter er tomme kort.
+  // Staggered start (h->v), hver rute starter DER DEN ER (ingen reset/phase).
+  // Robust mot tom rute: hver rute maaler sin EGEN glyfhoyde, og off klemmes saa
+  // reelen aldri ruller forbi siste glyf.
   lostAnimating = true;
   lostTimers.forEach(clearTimeout); lostTimers = [];
   cancelAnimationFrame(lostRAF);
@@ -170,20 +170,18 @@ function lostAnim(){
   const startStr = String(Math.max(0, secsIgjen()));
   const W = startStr.length;
   ensureCells(W, true);
-  const H = cells[0].el.getBoundingClientRect().height || 1;
-
   const LOST = '0123456789'.split('');
   const LN = LOST.length;
-  const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 1.3, HOLD = 0.9;
+  const ACC = 0.55, DEC = 0.95, VMAX = 14, STAG = 0.5, CRUISE = 0.5, HOLD = 0.9;
 
   function ordMaal(){
     let w = (currentOrd || '').trim().toUpperCase();
     if(!w) return null;
-    if(W >= w.length) return (' '.repeat(W - w.length) + w).split('');   // hoyrejuster: tomme kort til venstre, siste rute alltid en bokstav
+    if(W >= w.length) return (' '.repeat(W - w.length) + w).split('');   // hoyrejuster
     return w.slice(0, W).split('');
   }
   function cruise(pl, tt){
-    let p = pl.phase || 0;
+    let p = 0;
     if(tt <= pl.tStart) return p;
     const a = Math.min(tt, pl.tStart + ACC) - pl.tStart;
     if(a > 0) p += 0.5 * (VMAX/ACC) * a * a;
@@ -191,15 +189,19 @@ function lostAnim(){
     return p;
   }
   function G(x){ return '<div class="g">' + esc(x) + '</div>'; }
+  function measure(pl){ pl.H = (pl.reel.firstChild && pl.reel.firstChild.offsetHeight) || pl.c.el.getBoundingClientRect().height || 1; }
   function spinStrip(pl){
     pl.reel.style.transition = 'none';
     pl.reel.innerHTML = [pl.initGlyph].concat(LOST).concat(LOST).map(G).join('');
+    measure(pl);
   }
+  function clampOff(pl, off){ const max = pl.reel.children.length - 1; return off < 0 ? 0 : (off > max ? max : off); }
   function setSpin(pl, tt){
     const pos = cruise(pl, tt);
-    const off = (pos < 1) ? pos : 1 + ((pos - 1) % LN);
+    let off = (pos < 1) ? pos : 1 + ((pos - 1) % LN);
+    off = clampOff(pl, off);
     pl.reel.style.transition = 'none';
-    pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+    pl.reel.style.transform = 'translateY(' + (-off * pl.H) + 'px)';
   }
   function setDecel(pl, tt){
     if(!pl.landBuilt){
@@ -215,12 +217,14 @@ function lostAnim(){
       pl.L = g.length;
       pl.reel.style.transition = 'none';
       pl.reel.innerHTML = g.map(G).join('');
+      measure(pl);
     }
     const u = Math.min(1, (tt - pl.tDecel)/DEC);
     const e = 1 - Math.pow(1 - u, 3);
-    const off = pl.startFrac + e * ((pl.L - 1) - pl.startFrac);
+    let off = pl.startFrac + e * ((pl.L - 1) - pl.startFrac);
+    off = clampOff(pl, off);
     pl.reel.style.transition = 'none';
-    pl.reel.style.transform = 'translateY(' + (-off * H) + 'px)';
+    pl.reel.style.transform = 'translateY(' + (-off * pl.H) + 'px)';
     pl.doneDecel = (u >= 1);
   }
   function liveTick(pl, d){
@@ -229,22 +233,23 @@ function lostAnim(){
     pl.liveShown = d;
     pl.reel.style.transition = 'none';
     pl.reel.innerHTML = G(old) + G(d);
+    measure(pl);
     pl.reel.style.transform = 'translateY(0)';
     requestAnimationFrame(function(){
       pl.reel.style.transition = 'transform .45s cubic-bezier(0,0,.2,1)';
-      pl.reel.style.transform = 'translateY(' + (-H) + 'px)';
+      pl.reel.style.transform = 'translateY(' + (-pl.H) + 'px)';
     });
   }
   function mkPlan(c, i, tgt, initGlyph){
     const rank = W - 1 - i;
     return { c:c, reel:c.reel, tgt:(tgt===' '?'':tgt), blank:(tgt===' '||tgt===''),
-             initGlyph:(initGlyph==null||initGlyph===' '?'':initGlyph),
-             tStart:0, tDecel:ACC+CRUISE+rank*STAG, phase:Math.random()*LN,   // alle spinner fra start (ingen tom rute), men ute av synk; rightmost lander foerst
+             initGlyph:(initGlyph==null||initGlyph===' '?'':initGlyph), H:1,
+             tStart:rank*STAG, tDecel:(W-1)*STAG+ACC+CRUISE+rank*STAG,
              landBuilt:false, doneDecel:false, live:false, liveShown:null };
   }
 
   const word = ordMaal();
-  const cycEnd = ACC + CRUISE + (W-1)*STAG + DEC;
+  const cycEnd = (W-1)*STAG + ACC + CRUISE + (W-1)*STAG + DEC;
   const cyc2Start = word ? (cycEnd + HOLD) : 0;
 
   let cyc1 = null;
@@ -254,7 +259,7 @@ function lostAnim(){
   }
   let cyc2 = null;
   function buildCyc2(){
-    const init = word ? word : startStr.split('');    // start fra det som vises (bokstav/blank) -> ingen reset til 0
+    const init = word ? word : startStr.split('');    // start fra det som vises (ingen reset)
     cyc2 = cells.map(function(c,i){ return mkPlan(c, i, null, init[i]); });
     cyc2.forEach(function(pl){ spinStrip(pl); setSpin(pl, 0); });
   }
